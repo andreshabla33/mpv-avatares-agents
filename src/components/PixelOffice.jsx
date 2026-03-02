@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { COMMON_ZONES, CANAL_ICONS } from '../data/agents';
+import { CANAL_ICONS } from '../data/agents';
 
 const W = 1100;
 const H = 700;
