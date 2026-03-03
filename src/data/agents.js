@@ -7,23 +7,45 @@ const AGENT_COLORS = [
   '#c0eb75', '#fcc2d7', '#b2f2bb', '#e599f7', '#99e9f2',
 ];
 
-// Posiciones de escritorio — alineadas con drawOfficeLayout (deskStartX=100, colSpacing=130, rowSpacing=110)
+// Escritorios agrupados por zona/rol (90px horizontal, 100px vertical spacing)
+export const ZONE_DESKS = {
+  agendamiento: [
+    { x: 120, y: 180 }, { x: 210, y: 180 }, { x: 300, y: 180 },
+    { x: 120, y: 280 }, { x: 210, y: 280 }, { x: 300, y: 280 },
+  ],
+  agendarCita: [
+    { x: 470, y: 180 }, { x: 560, y: 180 }, { x: 650, y: 180 },
+    { x: 470, y: 280 }, { x: 560, y: 280 }, { x: 650, y: 280 },
+  ],
+  precalificacion: [
+    { x: 120, y: 460 }, { x: 210, y: 460 }, { x: 300, y: 460 },
+    { x: 120, y: 560 }, { x: 210, y: 560 }, { x: 300, y: 560 },
+  ],
+  soporte: [
+    { x: 470, y: 460 }, { x: 560, y: 460 }, { x: 650, y: 460 },
+    { x: 470, y: 560 }, { x: 560, y: 560 }, { x: 650, y: 560 },
+  ],
+};
+
+// HOME positions — idle agents sit here (center corridor, between zones)
+// These are SEPARATE from zone desks so idle agents don't appear in active zones
 const DESK_POSITIONS = [
-  // Row 0: x=100+col*130+32, y=290+row*110+36 (chair position = agent stands at chair)
-  { x: 152, y: 326 }, { x: 282, y: 326 }, { x: 412, y: 326 }, { x: 542, y: 326 },
-  // Row 1
-  { x: 152, y: 436 }, { x: 282, y: 436 }, { x: 412, y: 436 }, { x: 542, y: 436 },
-  // Row 2
-  { x: 152, y: 546 }, { x: 282, y: 546 }, { x: 412, y: 546 }, { x: 542, y: 546 },
+  { x: 180, y: 355 }, { x: 270, y: 355 }, { x: 360, y: 355 },
+  { x: 450, y: 355 }, { x: 540, y: 355 }, { x: 630, y: 355 },
+  { x: 180, y: 345 }, { x: 270, y: 345 }, { x: 360, y: 345 },
+  { x: 450, y: 345 }, { x: 540, y: 345 }, { x: 630, y: 345 },
 ];
 
-// Posiciones fijas en la sala OFF (wall: 740-1070, 220-680)
+// Posiciones fijas en la sala OFF (sidebar: x=740-1070, y=140-640)
+// Spaced 70px apart for 64px sprites at 2× scale
 const OFF_POSITIONS = [
-  { x: 790, y: 360 }, { x: 840, y: 360 }, { x: 890, y: 360 }, { x: 940, y: 360 }, { x: 990, y: 360 },
-  { x: 790, y: 410 }, { x: 840, y: 410 }, { x: 890, y: 410 }, { x: 940, y: 410 }, { x: 990, y: 410 },
-  { x: 790, y: 460 }, { x: 840, y: 460 }, { x: 890, y: 460 }, { x: 940, y: 460 }, { x: 990, y: 460 },
-  { x: 790, y: 510 }, { x: 840, y: 510 }, { x: 890, y: 510 }, { x: 940, y: 510 }, { x: 990, y: 510 },
-  { x: 790, y: 560 }, { x: 840, y: 560 }, { x: 890, y: 560 }, { x: 940, y: 560 }, { x: 990, y: 560 },
+  { x: 770, y: 160 }, { x: 840, y: 160 }, { x: 910, y: 160 }, { x: 980, y: 160 },
+  { x: 770, y: 240 }, { x: 840, y: 240 }, { x: 910, y: 240 }, { x: 980, y: 240 },
+  { x: 770, y: 320 }, { x: 840, y: 320 }, { x: 910, y: 320 }, { x: 980, y: 320 },
+  { x: 770, y: 400 }, { x: 840, y: 400 }, { x: 910, y: 400 }, { x: 980, y: 400 },
+  { x: 770, y: 480 }, { x: 840, y: 480 }, { x: 910, y: 480 }, { x: 980, y: 480 },
+  { x: 770, y: 560 }, { x: 840, y: 560 }, { x: 910, y: 560 }, { x: 980, y: 560 },
+  { x: 770, y: 640 }, { x: 840, y: 640 }, { x: 910, y: 640 }, { x: 980, y: 640 },
 ];
 
 // Agentes fallback si la API no responde
@@ -41,15 +63,17 @@ export const FALLBACK_AGENTS = [
 ];
 
 // Convierte datos crudos de la API a formato del canvas
+// v9: 1 avatar per agent, paused agents go to OFF area
 export function mapAgentsFromAPI(apiAgents) {
+  const results = [];
   let activeIdx = 0;
   let offIdx = 0;
 
-  return apiAgents.map((agent, i) => {
-    const hasRealData = agent.has_real_data === true;
+  apiAgents.forEach((agent, idx) => {
+    const isActive = (agent.active_channels || 0) > 0;
     let desk;
 
-    if (hasRealData) {
+    if (isActive) {
       desk = DESK_POSITIONS[activeIdx % DESK_POSITIONS.length];
       activeIdx++;
     } else {
@@ -57,21 +81,22 @@ export function mapAgentsFromAPI(apiAgents) {
       offIdx++;
     }
 
-    return {
+    results.push({
       id: agent.id,
       db_id: agent.db_id,
       name: agent.name,
       role: agent.role || 'General',
       llm: agent.llm || '',
-      canal: agent.canal || null,
-      msgs5min: agent.msgs_5min || 0,
-      color: AGENT_COLORS[i % AGENT_COLORS.length],
+      empresa: agent.empresa || '',
+      color: AGENT_COLORS[idx % AGENT_COLORS.length],
       deskX: desk.x,
       deskY: desk.y,
-      hasRealData,
+      hasRealData: isActive,
       lastActivity: agent.last_activity || null,
-    };
+    });
   });
+
+  return results;
 }
 
 // Genera lista fallback con posiciones
@@ -82,10 +107,12 @@ export function getFallbackAgents() {
   });
 }
 
+// Zonas de acción — el agente se mueve a la zona según su ESTADO actual
 export const ACTION_ZONES = {
-  responding: { x: 40,  y: 40, w: 260, h: 150, label: 'RESPONDIENDO MENSAJES', color: '#2ecc7122', borderColor: '#2ecc7155' },
-  scheduling: { x: 320, y: 40, w: 260, h: 150, label: 'AGENDANDO CITAS', color: '#3498db22', borderColor: '#3498db55' },
-  analyzing:  { x: 600, y: 40, w: 260, h: 150, label: 'ANÁLISIS Y ESTRATEGIA', color: '#9b59b622', borderColor: '#9b59b655' },
+  responding:  { x: 60,  y: 130, w: 280, h: 200, label: 'RESPONDIENDO MENSAJES' },
+  scheduling:  { x: 400, y: 130, w: 280, h: 200, label: 'AGENDAR CITA' },
+  qualifying:  { x: 60,  y: 400, w: 280, h: 200, label: 'PRECALIFICACIÓN' },
+  working:     { x: 400, y: 400, w: 280, h: 200, label: 'SOPORTE / TRABAJO' },
 };
 
 // Iconos de canal para dibujar sobre agente

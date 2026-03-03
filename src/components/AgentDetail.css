@@ -1,0 +1,37 @@
+/* AgentDetail Modal - Critical Styles */
+.agent-modal-content {
+  padding: 2rem !important;
+}
+
+.agent-modal-section {
+  padding: 2rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.agent-modal-spacing {
+  gap: 2rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.agent-metrics-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 0.75rem !important;
+}
+
+@media (min-width: 1024px) {
+  .agent-metrics-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .agent-modal-content {
+    padding: 1.5rem !important;
+  }
+  
+  .agent-modal-section {
+    padding: 1.5rem !important;
+  }
+}

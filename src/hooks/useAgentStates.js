@@ -112,7 +112,10 @@ export function useAgentStates(pollInterval = 5000) {
         agentData.forEach(item => {
           newStates[item.id] = item.status || 'idle';
           newExtras[item.id] = {
-            canal: item.canal || null,
+            channels: item.channels || [],
+            cities: item.cities || [],
+            activeChannels: item.active_channels || 0,
+            pausedChannels: item.paused_channels || 0,
             msgs5min: item.msgs_5min || 0,
             msgs2min: item.msgs_2min || 0,
             msgs1h: item.msgs_1h || 0,
@@ -120,9 +123,12 @@ export function useAgentStates(pollInterval = 5000) {
             msgs24hUser: item.msgs_24h_user || 0,
             convsActive5min: item.convs_active_5min || 0,
             convsOpen: item.convs_open || 0,
+            tokens_1h: item.tokens_1h || 0,
             actionText: item.action_text || '',
             lastTool: item.last_tool || null,
             role: item.role || 'General',
+            thought_traces: item.thought_traces || [],
+            empresa: item.empresa || '',
           };
         });
 
@@ -140,7 +146,7 @@ export function useAgentStates(pollInterval = 5000) {
               agentColor: mapped.find(m => m.id === item.id)?.color || '#fff',
               status: item.status,
               text: item.action_text || item.status,
-              canal: item.canal,
+              canal: (item.channels || []).filter(c => c.activo !== false).map(c => c.canal_short).join(', ') || null,
             });
           }
         });

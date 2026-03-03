@@ -26,11 +26,14 @@ const STATUS_LABELS = {
 
 export default function ActivityFeed({ log, kpis, apiAvailable }) {
   return (
-    <div className="w-[220px] h-[700px] bg-[#0a0a14] border-2 border-[#2a2a4e] rounded flex flex-col overflow-hidden">
-      {/* KPI Dashboard */}
-      <div className="px-3 py-2 border-b border-[#2a2a4e]">
-        <div className="text-[9px] font-mono text-[#4ecdc4] font-bold mb-1.5 tracking-wider">
-          DASHBOARD
+    <div className="w-full h-full bg-[#0a0a14]/90 backdrop-blur-md border border-[#2a2a4e] rounded-xl flex flex-col overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.4)] relative min-h-0">
+      {/* Glow top edge */}
+      <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#4ecdc4]/50 to-transparent shrink-0"></div>
+      {/* KPI Dashboard - Ultra Compact */}
+      <div className="px-3 py-2 border-b border-[#2a2a4e] shrink-0">
+        <div className="text-[9px] font-mono text-[#4ecdc4] font-bold mb-1.5 tracking-wider flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 bg-[#4ecdc4] rounded-full animate-pulse"></span>
+          MISSION CONTROL
         </div>
         <div className="grid grid-cols-2 gap-1.5">
           <KpiBox label="Msgs/1h" value={kpis.total_msgs_1h} color="#4ecdc4" />
@@ -39,15 +42,15 @@ export default function ActivityFeed({ log, kpis, apiAvailable }) {
           <KpiBox label="Activos" value={kpis.active_agents} total={kpis.total_agents} color="#2ecc71" />
         </div>
         {kpis.overloaded_agents > 0 && (
-          <div className="mt-1.5 px-2 py-1 bg-[#e74c3c22] border border-[#e74c3c44] rounded text-[8px] font-mono text-[#e74c3c] text-center animate-pulse">
+          <div className="mt-2 px-2 py-1 bg-[#e74c3c22] border border-[#e74c3c44] rounded text-[8px] font-mono text-[#e74c3c] text-center animate-pulse">
             ⚠ {kpis.overloaded_agents} AGENTE{kpis.overloaded_agents > 1 ? 'S' : ''} SOBRECARGADO{kpis.overloaded_agents > 1 ? 'S' : ''}
           </div>
         )}
       </div>
 
       {/* Activity Log */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="px-3 py-1.5 border-b border-[#2a2a4e] flex items-center justify-between">
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="px-4 py-2 border-b border-[#2a2a4e] flex items-center justify-between shrink-0">
           <span className="text-[9px] font-mono text-[#4a4a6a] font-bold tracking-wider">
             ACTIVITY LOG
           </span>
@@ -55,9 +58,12 @@ export default function ActivityFeed({ log, kpis, apiAvailable }) {
             {apiAvailable ? '● LIVE' : '○ DEMO'}
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto px-2 py-1 space-y-1">
+        <div className="flex-1 overflow-y-auto px-3 py-1 space-y-1 min-h-0">
           {log.length === 0 ? (
-            <div className="text-[9px] font-mono text-[#2a2a4e] text-center mt-8">
+            <div className="text-[9px] font-mono text-[#2a2a4e] text-center mt-6 flex flex-col items-center gap-1">
+              <div className="w-6 h-6 border border-[#2a2a4e] rounded-full flex items-center justify-center">
+                <span className="text-[10px]">○</span>
+              </div>
               Esperando actividad...
             </div>
           ) : (
