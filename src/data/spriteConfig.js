@@ -54,26 +54,6 @@ export const ANIMATIONS = {
   },
 };
 
-// Agent state → animation name
-export function getAnimForState(state) {
-  switch (state) {
-    case 'responding':
-    case 'sending':
-    case 'scheduling':
-    case 'qualifying':
-    case 'thinking':
-    case 'working':
-    case 'overloaded':
-      return 'attack';
-    case 'paused':
-      return 'hurt';
-    case 'idle':
-    case 'waiting':
-    default:
-      return 'idle';
-  }
-}
-
 // Collect all sprite paths for preloading
 export function getAllSpritePaths() {
   const paths = [];

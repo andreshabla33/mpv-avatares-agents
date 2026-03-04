@@ -1,19 +1,14 @@
 import { useState } from 'react';
 import { CANAL_ICONS } from '../data/agents';
+import { STATUS_COLORS } from '../data/statusConfig';
 import './AgentDetail.css';
-
-const STATUS_COLORS = {
-  responding: '#2ecc71', scheduling: '#3498db', qualifying: '#9b59b6',
-  sending: '#e67e22', thinking: '#1abc9c', working: '#2ecc71',
-  waiting: '#f39c12', overloaded: '#e74c3c', idle: '#636e72',
-  paused: '#e74c3c'
-};
 
 const SUPABASE_URL = 'https://vecspltvmyopwbjzerow.supabase.co';
 
 export default function AgentDetail({ agent, state, extra, onClose, onStateChange }) {
-  const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('metrics'); // 'metrics' | 'thoughts'
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState(null);
   
   if (!agent) return null;
 
@@ -25,26 +20,31 @@ export default function AgentDetail({ agent, state, extra, onClose, onStateChang
   const canalIcon = canal && CANAL_ICONS[canal];
 
   const togglePause = async () => {
-    if (isUpdating || isOff) return;
+    if (isUpdating) return;
     setIsUpdating(true);
-    
+    setError(null);
+
     const action = isPaused ? 'resume' : 'pause';
-    
+    const agentId = agent.agente_id || agent.db_id;
+
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/agent-control`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: agent.db_id, action })
+        body: JSON.stringify({ agentId, action }),
       });
-      
-      if (!res.ok) throw new Error('API error');
-      
-      // Optimistic update
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+
       if (onStateChange) {
         onStateChange(agent.id, isPaused ? 'idle' : 'paused');
       }
     } catch (e) {
-      console.error('Failed to update agent status:', e);
+      console.error('agent-control error:', e);
+      setError(e.message);
     } finally {
       setIsUpdating(false);
     }
@@ -139,18 +139,25 @@ export default function AgentDetail({ agent, state, extra, onClose, onStateChang
                   </div>
 
                   {!isOff && (
-                    <button 
-                      onClick={togglePause}
-                      disabled={isUpdating}
-                      className={`w-full px-4 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-bold tracking-wider rounded-md transition-all duration-300 border ${
-                        isUpdating ? 'opacity-50 cursor-not-allowed' :
-                        isPaused 
-                          ? 'bg-[#2ecc71]/10 text-[#2ecc71] border-[#2ecc71]/50 hover:bg-[#2ecc71]/20 hover:shadow-[0_0_15px_rgba(46,204,113,0.3)]'
-                          : 'bg-[#e74c3c]/10 text-[#e74c3c] border-[#e74c3c]/50 hover:bg-[#e74c3c]/20 hover:shadow-[0_0_15px_rgba(231,76,60,0.3)]'
-                      }`}
-                    >
-                      {isUpdating ? 'UPDATING...' : isPaused ? '▶ RESUME AGENT' : '⏸ PAUSE AGENT'}
-                    </button>
+                    <>
+                      <button 
+                        onClick={togglePause}
+                        disabled={isUpdating}
+                        className={`w-full px-4 sm:px-5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-bold tracking-wider rounded-md transition-all duration-300 border ${
+                          isUpdating ? 'opacity-50 cursor-not-allowed bg-[#1a1a2e] text-[#4a4a6a] border-[#2a2a4e]' :
+                          isPaused 
+                            ? 'bg-[#2ecc71]/10 text-[#2ecc71] border-[#2ecc71]/50 hover:bg-[#2ecc71]/20 hover:shadow-[0_0_15px_rgba(46,204,113,0.3)]'
+                            : 'bg-[#e74c3c]/10 text-[#e74c3c] border-[#e74c3c]/50 hover:bg-[#e74c3c]/20 hover:shadow-[0_0_15px_rgba(231,76,60,0.3)]'
+                        }`}
+                      >
+                        {isUpdating ? '⏳ UPDATING...' : isPaused ? '▶ RESUME AGENT' : '⏸ PAUSE AGENT'}
+                      </button>
+                      {error && (
+                        <div className="text-[9px] text-[#e74c3c] bg-[#e74c3c]/10 px-3 py-1.5 rounded border border-[#e74c3c]/20 mt-1">
+                          ⚠ {error}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -274,16 +281,13 @@ export default function AgentDetail({ agent, state, extra, onClose, onStateChang
               <div className="flex flex-col space-y-4">
                 <div className="text-[10px] text-[#4a4a6a] font-bold tracking-[0.2em]">SYSTEM INFO</div>
                 <div className="bg-[#050508]/80 rounded-xl border border-[#1a1a2e] agent-modal-section flex flex-col space-y-4">
-                  <InfoRow label="MODEL" value={(agent.llm || '').split('/').pop() || 'Unknown'} />
-                  <InfoRow label="CANAL" value={agent.canal || 'N/A'} />
-                  <InfoRow label="TIMEZONE" value={extra?.timezone || 'N/A'} />
-                  <InfoRow label="TELÉFONO" value={extra?.telefono || 'N/A'} />
                   <InfoRow label="EMPRESA" value={extra?.empresa || 'N/A'} />
+                  <InfoRow label="RUBRO" value={extra?.rubro || 'N/A'} />
+                  <InfoRow label="PAÍS" value={extra?.pais || 'N/A'} />
+                  <InfoRow label="AGENTE" value={extra?.nombre_agente || agent.name || 'N/A'} />
+                  <InfoRow label="ROL" value={extra?.role || agent.role || 'N/A'} />
+                  <InfoRow label="LLM" value={(extra?.llm || agent.llm || '').split('/').pop() || 'Unknown'} />
                   {extra?.lastTool && <InfoRow label="LAST TOOL" value={extra.lastTool} />}
-                  <InfoRow 
-                    label="LAST SYNC" 
-                    value={agent.last_activity ? new Date(agent.last_activity).toLocaleTimeString() : 'N/A'} 
-                  />
                 </div>
               </div>
             </>

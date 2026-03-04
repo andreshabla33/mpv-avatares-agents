@@ -129,6 +129,20 @@ export function useAgentStates(pollInterval = 5000) {
             role: item.role || 'General',
             thought_traces: item.thought_traces || [],
             empresa: item.empresa || '',
+            // Status & timing fields
+            number_is_active: item.number_is_active ?? (item.active_channels > 0),
+            minutes_without_response: item.minutes_without_response ?? -1,
+            last_agent_message_time: item.last_agent_message_time || null,
+            unanswered_msgs: item.unanswered_msgs || 0,
+            abandoned_convs: item.abandoned_convs || 0,
+            timezone: item.timezone || null,
+            telefono: item.telefono || null,
+            // Company & agent info
+            nombre_agente: item.nombre_agente || item.name || '',
+            rubro: item.rubro || '',
+            pais: item.pais || '',
+            llm: item.llm || '',
+            canal: item.canal || '',
           };
         });
 
@@ -146,7 +160,7 @@ export function useAgentStates(pollInterval = 5000) {
               agentColor: mapped.find(m => m.id === item.id)?.color || '#fff',
               status: item.status,
               text: item.action_text || item.status,
-              canal: (item.channels || []).filter(c => c.activo !== false).map(c => c.canal_short).join(', ') || null,
+              canal: ((item.channels || []).find(c => c.activo !== false) || {}).canal || null,
             });
           }
         });
@@ -170,23 +184,23 @@ export function useAgentStates(pollInterval = 5000) {
     } catch {
       // Don't override with mock data if we're just experiencing a temporary network blip
       // Let the stale data indicator handle it.
+      // When API has never been available, show agents as idle (no fake random states)
       if (!apiAvailableRef.current) {
         const fb = getFallbackAgents();
-        const mockStates = generateMockStates(fb);
-        const mockExtras = generateMockExtras(fb);
+        const idleStates = {};
+        const idleExtras = {};
+        fb.forEach(a => {
+          idleStates[a.id] = 'idle';
+          idleExtras[a.id] = {
+            canal: null, msgs5min: 0, msgs1h: 0, msgs24hAgent: 0, msgs24hUser: 0,
+            convsActive5min: 0, convsOpen: 0, actionText: 'Conectando...', lastTool: null,
+            role: a.role || 'General',
+          };
+        });
         setAgents(fb);
-        setStates(mockStates);
-        setExtras(mockExtras);
-        setKpis(generateMockKpis(fb, mockStates));
-        // Generate mock log entry
-        const entry = generateLogEntry(fb, mockStates, mockExtras);
-        if (entry) {
-           setActivityLog(prevLog => {
-             const nextLog = [entry, ...prevLog].slice(0, 50);
-             persistLogs(nextLog);
-             return nextLog;
-           });
-        }
+        setStates(idleStates);
+        setExtras(idleExtras);
+        setKpis({ total_agents: fb.length, active_agents: 0, total_msgs_1h: 0, total_msgs_24h: 0, total_convs_open: 0, overloaded_agents: 0 });
       }
     }
   }, []);

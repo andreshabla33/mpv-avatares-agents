@@ -10,6 +10,8 @@ import { animationEngine } from '../utils/AnimationEngine.js';
 import { spriteManager } from '../utils/SpriteManager.js';
 import { agentRenderer } from '../rendering/AgentRenderer.js';
 
+const DEBUG = false; // Set to true to enable verbose logging
+
 export class GameEngine {
   constructor(canvas) {
     this.canvas = canvas;
@@ -96,14 +98,14 @@ export class GameEngine {
   setupEventListeners() {
     this._lastLoggedCount = 0;
     eventSystem.subscribe(EVENT_TYPES.DATA_UPDATED, (data) => {
-      if (data.totalAgents !== this._lastLoggedCount) {
+      if (DEBUG && data.totalAgents !== this._lastLoggedCount) {
         console.log(`🔄 Data updated: ${data.totalAgents} agents, ${data.activeAgents} active`);
         this._lastLoggedCount = data.totalAgents;
       }
     });
 
     eventSystem.subscribe(EVENT_TYPES.AGENT_STATE_CHANGED, (data) => {
-      if (data.action === 'created') {
+      if (DEBUG && data.action === 'created') {
         console.log(`✨ Agent created: ${data.agent.name}`);
       }
     });
@@ -116,20 +118,20 @@ export class GameEngine {
     // Update entity manager
     entityManager.updateFromAPIResponse(agents);
     
-    // Debug: log state distribution when data changes
-    const stateKey = JSON.stringify(Object.values(states).sort());
-    if (this._lastStateKey !== stateKey) {
-      const stateCounts = {};
-      Object.entries(states).forEach(([id, s]) => { stateCounts[s] = (stateCounts[s] || 0) + 1; });
-      const allAgents = entityManager.getAllAgents();
-      const active = allAgents.filter(a => a.hasRealData);
-      const off = allAgents.filter(a => !a.hasRealData);
-      console.log(`📊 Estados: ${JSON.stringify(stateCounts)} | Entities: ${allAgents.length} (${active.length} activos, ${off.length} OFF)`);
-      // Log which agents have which states
-      active.forEach(a => {
-        console.log(`  ▸ ${a.name} → ${states[a.id] || 'NO STATE'} | pos(${Math.round(a.x)},${Math.round(a.y)}) desk(${a.deskX},${a.deskY})`);
-      });
-      this._lastStateKey = stateKey;
+    if (DEBUG) {
+      const stateKey = JSON.stringify(Object.values(states).sort());
+      if (this._lastStateKey !== stateKey) {
+        const stateCounts = {};
+        Object.entries(states).forEach(([id, s]) => { stateCounts[s] = (stateCounts[s] || 0) + 1; });
+        const allAgents = entityManager.getAllAgents();
+        const active = allAgents.filter(a => a.hasRealData);
+        const off = allAgents.filter(a => !a.hasRealData);
+        console.log(`📊 Estados: ${JSON.stringify(stateCounts)} | Entities: ${allAgents.length} (${active.length} activos, ${off.length} OFF)`);
+        active.forEach(a => {
+          console.log(`  ▸ ${a.name} → ${states[a.id] || 'NO STATE'} | pos(${Math.round(a.x)},${Math.round(a.y)}) desk(${a.deskX},${a.deskY})`);
+        });
+        this._lastStateKey = stateKey;
+      }
     }
 
     // Store current state for systems
@@ -198,9 +200,7 @@ export class GameEngine {
    * Render agent shadow (called by shadow layer)
    */
   renderAgentShadow(ctx, agent, frame) {
-    // Simple shadow for now
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(agent.x - 8, agent.y + 18, 20, 6);
+    // Shadow handled by AgentRenderer (ellipse shadow per agent)
   }
 
   /**
@@ -290,7 +290,7 @@ export class GameEngine {
    * Handle click events on agents
    */
   handleAgentClick(x, y, onAgentClick) {
-    const clickedAgent = entityManager.findNearestEntity(x, y, 30);
+    const clickedAgent = entityManager.findNearestEntity(x, y);
     if (clickedAgent && onAgentClick) {
       eventSystem.emit(EVENT_TYPES.AGENT_CLICKED, { agent: clickedAgent });
       onAgentClick(clickedAgent);

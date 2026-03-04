@@ -4,26 +4,22 @@
  */
 import { spriteManager } from '../utils/SpriteManager.js';
 import { effects2D } from '../utils/Effects2D.js';
-import { getCharacterType, getAnimForState, ANIMATIONS, FRAME_SIZE, RENDER_SCALE } from '../data/spriteConfig.js';
+import { getCharacterType, ANIMATIONS, FRAME_SIZE, RENDER_SCALE } from '../data/spriteConfig.js';
 import { CANAL_ICONS } from '../data/agents.js';
-
-const STATUS_COLORS = {
-  responding: '#2ecc71',
-  scheduling: '#3498db',
-  qualifying: '#9b59b6',
-  sending: '#e67e22',
-  thinking: '#1abc9c',
-  working: '#2ecc71',
-  waiting: '#f39c12',
-  overloaded: '#e74c3c',
-  idle: '#95a5a6',
-  paused: '#636e72',
-};
+import { STATUS_COLORS } from '../data/statusConfig.js';
 
 function renderAgent(ctx, agent, state, extra, frame) {
   const isOff = !agent.hasRealData;
   const charType = getCharacterType(agent.id);
-  const animName = isOff ? 'hurt' : getAnimForState(state);
+
+  // Determine animation by movement, not by state
+  // - Moving (pos != target) → walk
+  // - Stationary → idle
+  // - OFF/paused → hurt
+  const isMoving = agent.targetX !== undefined && agent.targetY !== undefined &&
+    (Math.abs(agent.x - agent.targetX) > 2 || Math.abs(agent.y - agent.targetY) > 2);
+  const animName = isOff ? 'hurt' : (isMoving ? 'walk' : 'idle');
+
   const charAnims = ANIMATIONS[charType];
   const anim = charAnims?.[animName] || charAnims?.idle;
 

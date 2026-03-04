@@ -1,27 +1,10 @@
 import { CANAL_ICONS } from '../data/agents';
+import { STATUS_COLORS, STATUS_ICONS } from '../data/statusConfig';
 
 const CANAL_LABELS = {
   whatsapp: 'WA', instagram: 'IG', messenger: 'MS',
   manychat: 'MC', web_chat: 'Web', facebook: 'FB',
   sms: 'SMS', email: 'Email',
-};
-
-const STATUS_COLORS = {
-  responding: '#2ecc71',
-  scheduling: '#3498db',
-  qualifying: '#9b59b6',
-  sending: '#e67e22',
-  thinking: '#1abc9c',
-  working: '#2ecc71',
-  waiting: '#f39c12',
-  overloaded: '#e74c3c',
-  idle: '#636e72',
-};
-
-const STATUS_ICONS = {
-  responding: '●', scheduling: '◈', qualifying: '◆',
-  sending: '▶', thinking: '◎', working: '●',
-  waiting: '◌', overloaded: '⚠', idle: '○',
 };
 
 export default function StatusBar({ agents, agentStates, extras, apiAvailable, kpis }) {
@@ -42,8 +25,7 @@ export default function StatusBar({ agents, agentStates, extras, apiAvailable, k
         {activeAgents.map(agent => {
           const state = agentStates[agent.id] || 'idle';
           const extra = extras[agent.id] || {};
-          const canal = extra.canal;
-          const canalIcon = canal && CANAL_ICONS[canal];
+          const activeChannels = (extra.channels || []).filter(c => c.activo !== false);
           const sColor = STATUS_COLORS[state] || '#636e72';
           const sIcon = STATUS_ICONS[state] || '○';
           return (
@@ -65,13 +47,21 @@ export default function StatusBar({ agents, agentStates, extras, apiAvailable, k
               >
                 {agent.name}
               </span>
-              {canalIcon && (
-                <span
-                  className="text-[7px] font-mono px-1 py-0.5 rounded shrink-0"
-                  style={{ backgroundColor: canalIcon.color + '22', color: canalIcon.color }}
-                >
-                  {CANAL_LABELS[canal] || canal}
-                </span>
+              {activeChannels.slice(0, 3).map((ch, i) => {
+                const key = (ch.canal || '').toLowerCase();
+                const icon = CANAL_ICONS[key];
+                return (
+                  <span
+                    key={i}
+                    className="text-[7px] font-mono px-1 py-0.5 rounded shrink-0"
+                    style={{ backgroundColor: (icon?.color || '#aaa') + '22', color: icon?.color || '#aaa' }}
+                  >
+                    {ch.canal_short || CANAL_LABELS[key] || key}
+                  </span>
+                );
+              })}
+              {activeChannels.length > 3 && (
+                <span className="text-[6px] font-mono text-[#4a4a6a] shrink-0">+{activeChannels.length - 3}</span>
               )}
               <span className="text-[8px] font-mono shrink-0" style={{ color: sColor }}>
                 {sIcon}

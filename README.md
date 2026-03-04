@@ -2,7 +2,7 @@
 
 Interfaz de observabilidad operativa en tiempo real representada como una oficina 2D Pixel Art. Monitorea el estado, carga de trabajo y actividad de agentes de IA conversacionales conectados a múltiples canales de mensajería (WhatsApp, Instagram, ManyChat, Facebook, SMS) sin acceso a bases de datos o logs. Democratiza el monitoreo técnico para stakeholders operativos y directivos.
 
-![React](https://img.shields.io/badge/React_19-Canvas_2D-blue) ![Supabase](https://img.shields.io/badge/Supabase-Edge_Functions_v9-green) ![Vite](https://img.shields.io/badge/Vite-v7-purple) ![Sprites](https://img.shields.io/badge/Sprites-Chibi_Fantasy-orange)
+![React](https://img.shields.io/badge/React_19-Canvas_2D-blue) ![Supabase](https://img.shields.io/badge/Supabase-Edge_Functions_v14-green) ![Vite](https://img.shields.io/badge/Vite-v7-purple) ![Sprites](https://img.shields.io/badge/Sprites-Chibi_Fantasy-orange)
 
 ## Problema que resuelve
 
@@ -26,14 +26,16 @@ Supabase PostgreSQL
 └──────────────────────────────────────────────────────────┘
          │
          ▼
-Edge Function: agent-office-status v9 (Deno)
+Edge Function: agent-office-status v14 (Deno)
          │
          ├─► 1 avatar por agente (agrega todos sus números/canales)
-         ├─► Solo agentes con números en wp_numeros aparecen
+         ├─► Solo agentes no archivados con números en wp_numeros aparecen
          ├─► Números con activo=false no contribuyen a métricas
          ├─► Estado = el más activo de todos sus canales
-         ├─► channels[] = detalle por número (canal, ciudad, status)
+         ├─► channels[] = detalle por número (canal, teléfono, activo)
          ├─► Métricas: msgs 2min/5min/1h/24h, convos, tokens
+         ├─► Info empresa: nombre, rubro, país (wp_empresa_perfil)
+         ├─► Info agente: nombre_agente, rol, llm (wp_agentes)
          │
          └─► Retorna: { agents: [...], kpis: {...} }
 
@@ -168,6 +170,165 @@ Motor custom en Canvas 2D (`< 30KB`). No degrada performance tras días de ejecu
 - **Activity Log**: Historial persistente en `localStorage`
 - **Zone labels**: Texto legible con fondo semitransparente
 
+## Edge Function: `agent-office-status` v14
+
+### Endpoint
+
+```
+GET https://vecspltvmyopwbjzerow.supabase.co/functions/v1/agent-office-status
+```
+
+No requiere autenticación (JWT deshabilitado). Responde en ~700-800ms.
+
+### Arquitectura interna
+
+La función ejecuta 7 queries secuenciales a Supabase PostgreSQL:
+
+| # | Tabla | Propósito |
+|---|-------|-----------|
+| 1 | `wp_numeros` + joins | Todos los números con info de agente y empresa |
+| 2 | `wp_conversaciones` | Conversaciones activas por agente |
+| 3 | `wp_mensajes` | Mensajes últimos 5 min (actividad inmediata) |
+| 4 | `wp_mensajes` | Mensajes última hora (rate) |
+| 5 | `wp_mensajes` | Mensajes últimas 24h (volumen diario) |
+| 6 | `wp_mensajes` | Mensajes sin respuesta (detección fallos n8n) |
+| 7 | `wp_conversaciones` | Conversaciones abandonadas (>2h sin respuesta) |
+
+### Query principal (FK hints)
+
+La tabla `wp_numeros` tiene dos foreign keys a `wp_agentes` (`agente_id` y `agente_id_ab`), lo que causa ambigüedad en PostgREST. Se resuelve con FK hints explícitos:
+
+```sql
+wp_agentes!wp_numeros_agente_id_fkey(id, nombre_agente, rol, llm, archivado)
+wp_empresa_perfil!wp_numeros_empresa_id_fkey(id, nombre, rubro, pais)
+```
+
+El filtrado de agentes archivados se hace en JavaScript (no con `.eq()` en el query) porque el FK hint sin `!inner` genera LEFT JOINs donde `wp_agentes` puede ser null.
+
+### Agregación por agente
+
+Los números se agrupan por `agente_id` en un `agentGroupMap`. Cada agente recibe:
+- `channels[]` — array con detalle de cada número (canal, teléfono, activo, timezone)
+- `active_channels` — cantidad de números con `activo=true`
+- `paused_channels` — cantidad de números con `activo=false`
+- Métricas agregadas de todos sus canales activos
+
+### Detección de estado
+
+El estado se determina por prioridad descendente:
+
+```
+overloaded  → 5+ conversaciones activas en 5 min
+scheduling  → Herramienta de agenda (cita/calendly/schedule)
+qualifying  → Herramienta de calificación
+sending     → Herramienta de envío (imagen/send)
+thinking    → Herramienta de análisis
+responding  → Mensajes del agente en últimos 2 min
+waiting     → Usuario envió mensaje, agente no ha respondido (>90s)
+working     → Mensajes del agente en últimos 5 min
+idle        → Sin actividad reciente
+paused      → Todos los canales con activo=false
+```
+
+Si **todos** los canales de un agente tienen `activo=false`, el estado es `paused` independientemente de la actividad.
+
+### Respuesta JSON
+
+```json
+{
+  "agents": [
+    {
+      "id": "agent-7",
+      "agente_id": 7,
+      "name": "Monica URPE INTEGRAL",
+      "nombre_agente": "Monica URPE INTEGRAL",
+      "empresa": "URPE Integral",
+      "rubro": "Construcción",
+      "pais": "Colombia",
+      "role": "Cerrador",
+      "llm": "openai/gpt-4o",
+      "status": "responding",
+      "action_text": "Respondiendo (3 msgs)",
+      "channels": [
+        { "numero_id": 1, "canal": "manychat", "telefono": "+1...", "activo": true, "timezone": "America/Bogota", "nombre": "Urpe ManyChat Monica" },
+        { "numero_id": 5, "canal": "whatsapp", "telefono": "+57...", "activo": true, "timezone": "America/Bogota", "nombre": "Urpe Integral" }
+      ],
+      "active_channels": 7,
+      "paused_channels": 0,
+      "msgs_2min": 3,
+      "msgs_5min": 8,
+      "msgs_1h": 45,
+      "msgs_24h_agent": 312,
+      "msgs_24h_user": 289,
+      "convs_active_5min": 4,
+      "convs_open": 15,
+      "last_tool": "buscar_disponibilidad",
+      "tokens_1h": 12500,
+      "thought_traces": [
+        { "ts": "2026-03-03T...", "content": "...", "tools": [...], "contacto_id": 1234, "conversacion_id": 5678 }
+      ],
+      "unanswered_msgs": 0,
+      "abandoned_convs": 1,
+      "last_agent_message_time": "2026-03-03T21:05:00.000Z",
+      "minutes_without_response": 2,
+      "number_is_active": true,
+      "has_real_data": true,
+      "last_activity": "2026-03-03T21:05:00.000Z"
+    }
+  ],
+  "kpis": {
+    "total_agents": 10,
+    "active_agents": 3,
+    "total_msgs_1h": 120,
+    "total_msgs_24h": 2500,
+    "total_convs_open": 45,
+    "overloaded_agents": 1
+  }
+}
+```
+
+### Campos del agente
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | string | `agent-{agente_id}` — identificador único |
+| `agente_id` | number | ID en `wp_agentes` |
+| `name` / `nombre_agente` | string | Nombre del agente |
+| `empresa` | string | Nombre de la empresa (wp_empresa_perfil.nombre) |
+| `rubro` | string | Industria de la empresa |
+| `pais` | string | País de la empresa |
+| `role` | string | Rol del agente (wp_agentes.rol) |
+| `llm` | string | Modelo LLM usado (ej: `openai/gpt-4o`) |
+| `status` | string | Estado actual (ver tabla de estados) |
+| `action_text` | string | Texto descriptivo de la acción actual |
+| `channels` | array | Detalle de cada número/canal del agente |
+| `active_channels` | number | Números con `activo=true` |
+| `paused_channels` | number | Números con `activo=false` |
+| `msgs_2min` | number | Mensajes del agente en últimos 2 min |
+| `msgs_5min` | number | Mensajes del agente en últimos 5 min |
+| `msgs_1h` | number | Total mensajes en última hora |
+| `msgs_24h_agent` | number | Mensajes del agente en 24h |
+| `msgs_24h_user` | number | Mensajes de usuarios en 24h |
+| `convs_active_5min` | number | Conversaciones con actividad en 5 min |
+| `convs_open` | number | Conversaciones con seguimiento='abierta' |
+| `last_tool` | string? | Última herramienta usada |
+| `tokens_1h` | number | Tokens estimados en última hora (~4 chars/token) |
+| `thought_traces` | array | Últimos 10 mensajes del agente con herramientas y contacto |
+| `unanswered_msgs` | number | Mensajes de usuario sin respuesta (>5 min) |
+| `abandoned_convs` | number | Conversaciones abandonadas (>2h sin respuesta) |
+| `minutes_without_response` | number | Minutos desde último mensaje del agente (-1 si nunca) |
+| `number_is_active` | boolean | `true` si al menos 1 canal activo |
+| `has_real_data` | boolean | `true` si tiene conversaciones registradas |
+
+### Versionado
+
+| Versión | Cambio principal |
+|---------|------------------|
+| v9 | Arquitectura original: 1 avatar por agente, agregación por agente_id |
+| v10-v11 | (Roto) Intento de cambiar a 1 por número — causó 500 por FK ambiguity |
+| v12-v13 | Fix FK hints + filtro JS, pero modelo per-number (27 avatares) |
+| v14 | **Restaura modelo v9**: 1 avatar por agente + FK hints + empresa info (rubro, pais) |
+
 ## Limitaciones y próximos pasos
 
 1. **Read-Only**: No se puede pausar/reiniciar agentes desde el dashboard
@@ -195,7 +356,7 @@ No se requieren variables de entorno en el frontend (la URL de Supabase está ha
 
 - **Frontend**: React 19 + Vite 7 + TailwindCSS 4
 - **Canvas**: HTML5 Canvas 2D (sin librerías externas)
-- **Backend**: Supabase Edge Functions v9 (Deno)
+- **Backend**: Supabase Edge Functions v14 (Deno)
 - **Audio**: Native Web Audio API
 - **Sprites**: CraftPix Chibi Fantasy (128×128 horizontal strips)
 

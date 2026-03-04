@@ -109,8 +109,8 @@ function App() {
           extra={extras[selectedAgent.id] || {}}
           onClose={() => setSelectedAgent(null)}
           onStateChange={(agentId, newState) => {
-            // Optimistic update for pause/resume
-            // This will be overridden by the next API poll but provides instant feedback
+            // Optimistic update — next API poll will confirm or revert
+            setSelectedAgent(prev => prev ? { ...prev, hasRealData: newState !== 'paused' } : null);
           }}
         />
       )}

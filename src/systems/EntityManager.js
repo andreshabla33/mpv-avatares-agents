@@ -191,15 +191,6 @@ export class EntityManager {
   }
 
   /**
-   * Query entities with specific components
-   */
-  queryEntitiesWithComponents(componentTypes) {
-    return this.getAllAgents().filter(agent => {
-      return componentTypes.every(type => agent.hasComponent(type));
-    });
-  }
-
-  /**
    * Get entities in a specific area (spatial query)
    */
   getEntitiesInArea(x, y, width, height) {
@@ -212,7 +203,7 @@ export class EntityManager {
   /**
    * Find nearest entity to a point
    */
-  findNearestEntity(x, y, maxDistance = Infinity) {
+  findNearestEntity(x, y, maxDistance = 60) {
     let nearest = null;
     let minDistance = maxDistance;
 

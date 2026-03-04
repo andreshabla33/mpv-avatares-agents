@@ -127,10 +127,11 @@ export default function PixelOffice({
         ref={canvasRef}
         width={BASE_W}
         height={BASE_H}
-        className={`block mx-auto border-2 border-[#2a2a4e] rounded cursor-crosshair w-full h-auto max-w-full pixelated ${className}`}
+        className={`block mx-auto border-2 border-[#2a2a4e] rounded cursor-crosshair w-full h-auto max-w-full max-h-full pixelated ${className}`}
         style={{ 
           imageRendering: 'pixelated',
-          background: '#0f0f23'
+          background: '#0f0f23',
+          aspectRatio: `${BASE_W} / ${BASE_H}`,
         }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}

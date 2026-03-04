@@ -37,39 +37,6 @@ export class Agent {
     this.currentZone = null;
     this.idleTimer = 0;
     this._transitionFrame = null;
-    
-    // Components (will be managed by component system)
-    this.components = new Map();
-  }
-
-  /**
-   * Add a component to this entity
-   */
-  addComponent(componentType, componentData) {
-    this.components.set(componentType, componentData);
-    return this;
-  }
-
-  /**
-   * Get a component from this entity
-   */
-  getComponent(componentType) {
-    return this.components.get(componentType);
-  }
-
-  /**
-   * Check if entity has a component
-   */
-  hasComponent(componentType) {
-    return this.components.has(componentType);
-  }
-
-  /**
-   * Remove a component
-   */
-  removeComponent(componentType) {
-    this.components.delete(componentType);
-    return this;
   }
 
   /**
@@ -115,18 +82,6 @@ export class Agent {
       position: { x: this.x, y: this.y },
       target: { x: this.targetX, y: this.targetY },
       hasRealData: this.hasRealData,
-      components: Array.from(this.components.entries())
     };
   }
 }
-
-// Component types for ECS
-export const COMPONENT_TYPES = {
-  POSITION: 'position',
-  MOVEMENT: 'movement', 
-  SPRITE: 'sprite',
-  ANIMATION: 'animation',
-  STATE: 'state',
-  METRICS: 'metrics',
-  BEHAVIOR: 'behavior'
-};
