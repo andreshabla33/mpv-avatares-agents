@@ -2,7 +2,7 @@
  * InteriorMapGenerator - Guild hall interior office layout using pixel art tiles
  * Creates a warm interior background for the agent office visualization
  */
-import { spriteManager } from './SpriteManager.js';
+import { spriteManager as _spriteManager } from './SpriteManager.js';
 
 export class CityMapGenerator {
   constructor(width, height) {
@@ -247,7 +247,7 @@ export class CityMapGenerator {
   /**
    * Draw a row of desks
    */
-  drawDeskRow(ctx, startX, startY, count, orientation) {
+  drawDeskRow(ctx, startX, startY, count, _orientation) {
     const spacing = 65;
     for (let i = 0; i < count; i++) {
       const x = startX + i * spacing;

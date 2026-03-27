@@ -12,16 +12,37 @@ export default function StatusBar({ agents, agentStates, extras, apiAvailable, k
   const offAgents = agents.filter(a => !a.hasRealData);
 
   return (
-    <div className="w-full bg-[#0d0d1a]/95 backdrop-blur-md border-t border-[#2a2a4e] shadow-inner overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-1">
-        <span className="text-[9px] font-mono text-[#4a4a6a]">
-          {apiAvailable ? '● LIVE — UAL Office Virtual Agent' : '○ MODO DEMO — Sin conexión API'}
+    <div style={{
+      width: '100%',
+      background: 'var(--pixel-bg)',
+      borderTop: '2px solid var(--pixel-border)',
+      overflow: 'hidden',
+      padding: '4px 8px'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '4px 8px',
+        borderBottom: '2px dashed var(--pixel-border)'
+      }}>
+        <span style={{ fontSize: '20px', color: 'var(--pixel-text-dim)' }}>
+          {apiAvailable ? '● LIVE — UAL Office Virtual Agent' : '○ DEMO MODE — No API Connection'}
         </span>
-        <span className="text-[9px] font-mono text-[#4a4a6a]">
-          {activeAgents.length} activos · {offAgents.length} off · {kpis?.total_msgs_1h || 0} msgs/h
+        <span style={{ fontSize: '20px', color: 'var(--pixel-text-dim)' }}>
+          {activeAgents.length} active · {offAgents.length} off · {kpis?.total_msgs_1h || 0} msgs/h
         </span>
       </div>
-      <div className="flex items-center justify-center gap-1 py-1 px-3 flex-wrap max-h-[40px] overflow-hidden">
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        padding: '8px',
+        flexWrap: 'wrap',
+        maxHeight: '48px',
+        overflow: 'hidden'
+      }}>
         {activeAgents.map(agent => {
           const state = agentStates[agent.id] || 'idle';
           const extra = extras[agent.id] || {};
@@ -31,19 +52,35 @@ export default function StatusBar({ agents, agentStates, extras, apiAvailable, k
           return (
             <div
               key={agent.id}
-              className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-md border text-xs sm:text-sm transition-all hover:scale-105"
               style={{
-                borderColor: state === 'overloaded' ? '#e74c3c66' : agent.color + '33',
-                backgroundColor: state === 'overloaded' ? '#e74c3c11' : agent.color + '08',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 8px',
+                border: '2px solid var(--pixel-border)',
+                background: 'var(--pixel-btn-bg)',
+                transition: 'all 0.2s'
               }}
             >
               <div
-                className="w-2 h-2 rounded-sm shrink-0"
-                style={{ backgroundColor: agent.color }}
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: agent.color,
+                  flexShrink: 0,
+                  boxShadow: 'var(--pixel-shadow)'
+                }}
               />
               <span
-                className="text-[8px] sm:text-[9px] font-mono font-bold max-w-[50px] sm:max-w-[70px] truncate"
-                style={{ color: agent.color }}
+                style={{
+                  fontSize: '18px',
+                  color: agent.color,
+                  maxWidth: '80px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  textShadow: 'var(--pixel-shadow)'
+                }}
               >
                 {agent.name}
               </span>
@@ -53,21 +90,29 @@ export default function StatusBar({ agents, agentStates, extras, apiAvailable, k
                 return (
                   <span
                     key={i}
-                    className="text-[7px] font-mono px-1 py-0.5 rounded shrink-0"
-                    style={{ backgroundColor: (icon?.color || '#aaa') + '22', color: icon?.color || '#aaa' }}
+                    style={{
+                      fontSize: '16px',
+                      padding: '2px 4px',
+                      background: 'var(--pixel-bg)',
+                      border: `2px solid ${icon?.color || '#aaa'}`,
+                      color: icon?.color || '#aaa',
+                      flexShrink: 0
+                    }}
                   >
                     {ch.canal_short || CANAL_LABELS[key] || key}
                   </span>
                 );
               })}
               {activeChannels.length > 3 && (
-                <span className="text-[6px] font-mono text-[#4a4a6a] shrink-0">+{activeChannels.length - 3}</span>
+                <span style={{ fontSize: '16px', color: 'var(--pixel-text-dim)', flexShrink: 0 }}>
+                  +{activeChannels.length - 3}
+                </span>
               )}
-              <span className="text-[8px] font-mono shrink-0" style={{ color: sColor }}>
+              <span style={{ fontSize: '18px', color: sColor, flexShrink: 0, textShadow: 'var(--pixel-shadow)' }}>
                 {sIcon}
               </span>
               {extra.convsActive5min > 0 && (
-                <span className="text-[7px] font-mono text-[#74b9ff] shrink-0">
+                <span style={{ fontSize: '16px', color: 'var(--pixel-accent)', flexShrink: 0 }}>
                   {extra.convsActive5min}c
                 </span>
               )}
@@ -75,7 +120,7 @@ export default function StatusBar({ agents, agentStates, extras, apiAvailable, k
           );
         })}
         {offAgents.length > 0 && (
-          <span className="text-[8px] font-mono text-[#2a2a3e] px-1">
+          <span style={{ fontSize: '18px', color: 'var(--pixel-text-dim)', padding: '0 8px' }}>
             +{offAgents.length} off
           </span>
         )}

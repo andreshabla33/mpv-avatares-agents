@@ -1,0 +1,27 @@
+# Security Policy for UAL Office Virtual Agent CRM
+# https://securitytxt.org/
+
+# Contact Information
+Contact: mailto:security@urpe.com
+Contact: https://urpe.com/security/report
+
+# Expiration Date (1 year from creation)
+Expires: 2027-03-25T00:00:00.000Z
+
+# Encryption (optional - if you have a PGP key)
+# Encryption: https://urpe.com/pgp-key.txt
+
+# Acknowledgments
+Acknowledgments: https://urpe.com/security/hall-of-fame
+
+# Preferred-Languages
+Preferred-Languages: es, en
+
+# Canonical URI
+Canonical: https://ual-office-virtual-agent.netlify.app/.well-known/security.txt
+
+# Policy
+Policy: https://urpe.com/security/policy
+
+# Hiring (optional)
+# Hiring: https://urpe.com/careers/security

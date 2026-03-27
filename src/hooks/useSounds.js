@@ -20,7 +20,7 @@ function playTone(freq, duration, type = 'square', volume = 0.08) {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + duration);
-  } catch {}
+  } catch { /* ignore audio errors */ }
 }
 
 // Sound effects

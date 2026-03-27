@@ -1,0 +1,1 @@
+export default function Office2DView() { return <div>Office 2D Engine Placeholder</div>; }

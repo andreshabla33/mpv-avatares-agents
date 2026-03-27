@@ -103,7 +103,7 @@ export class AnimationEngine {
    * Actualiza todas las animaciones activas
    */
   update(currentTime) {
-    for (const [entityId, animation] of this.activeAnimations) {
+    for (const [_entityId, animation] of this.activeAnimations) {
       animation.update(currentTime);
     }
   }

@@ -34,7 +34,7 @@ export default function PixelOffice({
       gameEngineRef.current = gameEngine;
     } catch (error) {
       console.error('❌ GameEngine creation failed:', error);
-      setLoadingStatus(`Error creating GameEngine: ${error.message}`);
+      setLoadingStatus(`Error creating GameEngine: ${error.message}`); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
 

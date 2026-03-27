@@ -9,13 +9,15 @@ import { ZONE_DESKS } from '../data/agents.js';
 const STATE_TO_ZONE = {
   responding:  'agendamiento',
   sending:     'agendamiento',
-  overloaded:  'agendamiento',
   scheduling:  'agendarCita',
   qualifying:  'precalificacion',
   thinking:    'precalificacion',
   waiting:     'soporte',
   working:     'soporte',
 };
+
+// Estados que van a sus posiciones asignadas (deskX/deskY) en lugar de zonas
+const HOME_STATES = new Set(['idle', 'paused', 'overloaded', 'error', 'crashed']);
 
 // Simple moveTowards — same as monolith
 function moveTowards(ax, ay, tx, ty, speed) {
@@ -38,7 +40,7 @@ export class AgentBehaviorSystem {
     this._zoneSlots = new Map();    // id → { zoneKey, slotIdx } assigned zone desk
   }
 
-  update(states, deltaTime, frame) {
+  update(states, _deltaTime, _frame) {
     const agents = this.entityManager.getAllAgents();
 
     // Clean up slots for agents that no longer exist
@@ -103,11 +105,18 @@ export class AgentBehaviorSystem {
     }
   }
 
-  _assignTarget(agent, state, allAgents) {
-    const zoneKey = STATE_TO_ZONE[state];
+  _assignTarget(agent, state, _allAgents) {
+    // Estados que van a su posición asignada (cubículo, lounge o urinal)
+    if (HOME_STATES.has(state)) {
+      agent.targetX = agent.deskX;
+      agent.targetY = agent.deskY;
+      this._zoneSlots.delete(agent.id);
+      return;
+    }
 
+    const zoneKey = STATE_TO_ZONE[state];
     if (!zoneKey) {
-      // idle, paused, overloaded, waiting → go home to desk
+      // Cualquier otro estado desconocido va a su posición asignada
       agent.targetX = agent.deskX;
       agent.targetY = agent.deskY;
       this._zoneSlots.delete(agent.id);

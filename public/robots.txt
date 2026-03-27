@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+# Rutas administrativas y de API - no indexar
+Disallow: /admin/
+Disallow: /api/
+Disallow: /private/
+Disallow: /dashboard/settings/
+
+# Archivos de configuración y datos sensibles
+Disallow: /.env
+Disallow: /config/
+Disallow: /secrets/
+
+# Sitemap para SEO positivo
+Sitemap: https://ual-office-virtual-agent.netlify.app/sitemap.xml

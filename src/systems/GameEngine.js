@@ -7,7 +7,7 @@ import { AgentBehaviorSystem } from './AgentBehaviorSystem.js';
 import { RenderingEngine, RENDER_LAYERS } from './RenderingEngine.js';
 import { eventSystem, EVENT_TYPES } from './EventSystem.js';
 import { animationEngine } from '../utils/AnimationEngine.js';
-import { spriteManager } from '../utils/SpriteManager.js';
+import { spriteManager as _spriteManager } from '../utils/SpriteManager.js';
 import { agentRenderer } from '../rendering/AgentRenderer.js';
 
 const DEBUG = false; // Set to true to enable verbose logging
@@ -40,7 +40,7 @@ export class GameEngine {
     // Background layer (z-index: 0)
     this.renderingEngine.registerLayer(
       RENDER_LAYERS.BACKGROUND,
-      (ctx, data) => {
+      (_ctx, _data) => {
         // Background is handled in renderBackground()
       },
       0
@@ -122,7 +122,7 @@ export class GameEngine {
       const stateKey = JSON.stringify(Object.values(states).sort());
       if (this._lastStateKey !== stateKey) {
         const stateCounts = {};
-        Object.entries(states).forEach(([id, s]) => { stateCounts[s] = (stateCounts[s] || 0) + 1; });
+        Object.entries(states).forEach(([_id, s]) => { stateCounts[s] = (stateCounts[s] || 0) + 1; });
         const allAgents = entityManager.getAllAgents();
         const active = allAgents.filter(a => a.hasRealData);
         const off = allAgents.filter(a => !a.hasRealData);
@@ -164,7 +164,7 @@ export class GameEngine {
    * Update all game systems
    */
   update(deltaTime) {
-    const agents = entityManager.getAllAgents();
+    const _agents = entityManager.getAllAgents();
     
     // Update behaviors
     this.behaviorSystem.update(this.currentStates, deltaTime, this.frame);
@@ -199,14 +199,14 @@ export class GameEngine {
   /**
    * Render agent shadow (called by shadow layer)
    */
-  renderAgentShadow(ctx, agent, frame) {
+  renderAgentShadow(_ctx, _agent, _frame) {
     // Shadow handled by AgentRenderer (ellipse shadow per agent)
   }
 
   /**
    * Render post-processing effects
    */
-  renderPostEffects(ctx, agents, states, extras, frame) {
+  renderPostEffects(ctx, _agents, _states, _extras, _frame) {
     // Scanlines
     ctx.fillStyle = 'rgba(0,0,0,0.04)';
     for (let y = 0; y < this.canvas.height; y += 3) {

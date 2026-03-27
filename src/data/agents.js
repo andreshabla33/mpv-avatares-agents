@@ -30,22 +30,28 @@ export const ZONE_DESKS = {
 // HOME positions — idle agents sit here (center corridor, between zones)
 // These are SEPARATE from zone desks so idle agents don't appear in active zones
 const DESK_POSITIONS = [
-  { x: 180, y: 355 }, { x: 270, y: 355 }, { x: 360, y: 355 },
-  { x: 450, y: 355 }, { x: 540, y: 355 }, { x: 630, y: 355 },
-  { x: 180, y: 345 }, { x: 270, y: 345 }, { x: 360, y: 345 },
-  { x: 450, y: 345 }, { x: 540, y: 345 }, { x: 630, y: 345 },
+  { x: 48, y: 112 }, { x: 144, y: 112 }, { x: 240, y: 112 },
+  { x: 48, y: 192 }, { x: 144, y: 192 }, { x: 240, y: 192 },
+  { x: 48, y: 272 }, { x: 144, y: 272 }, { x: 240, y: 272 },
+  { x: 48, y: 352 }, { x: 144, y: 352 }, { x: 240, y: 352 }
 ];
 
 // Posiciones fijas en la sala OFF (sidebar: x=740-1070, y=140-640)
 // Spaced 70px apart for 64px sprites at 2× scale
 const OFF_POSITIONS = [
-  { x: 770, y: 160 }, { x: 840, y: 160 }, { x: 910, y: 160 }, { x: 980, y: 160 },
-  { x: 770, y: 240 }, { x: 840, y: 240 }, { x: 910, y: 240 }, { x: 980, y: 240 },
-  { x: 770, y: 320 }, { x: 840, y: 320 }, { x: 910, y: 320 }, { x: 980, y: 320 },
-  { x: 770, y: 400 }, { x: 840, y: 400 }, { x: 910, y: 400 }, { x: 980, y: 400 },
-  { x: 770, y: 480 }, { x: 840, y: 480 }, { x: 910, y: 480 }, { x: 980, y: 480 },
-  { x: 770, y: 560 }, { x: 840, y: 560 }, { x: 910, y: 560 }, { x: 980, y: 560 },
-  { x: 770, y: 640 }, { x: 840, y: 640 }, { x: 910, y: 640 }, { x: 980, y: 640 },
+  { x: 400, y: 80 }, { x: 496, y: 80 },
+  { x: 400, y: 144 }, { x: 496, y: 144 },
+  { x: 400, y: 208 }, { x: 496, y: 208 },
+  { x: 432, y: 272 }, { x: 464, y: 272 },
+  { x: 400, y: 320 }, { x: 496, y: 320 },
+  { x: 432, y: 352 }, { x: 464, y: 352 }
+];
+
+export const ERROR_POSITIONS = [
+  { x: 592, y: 32 }, { x: 624, y: 32 }, { x: 656, y: 32 },
+  { x: 688, y: 32 }, { x: 720, y: 32 }, { x: 752, y: 32 },
+  { x: 592, y: 432 }, { x: 624, y: 432 }, { x: 656, y: 432 },
+  { x: 688, y: 432 }, { x: 720, y: 432 }, { x: 752, y: 432 }
 ];
 
 // Agentes fallback si la API no responde
@@ -63,22 +69,39 @@ export const FALLBACK_AGENTS = [
 ];
 
 // Convierte datos crudos de la API a formato del canvas
-// v9: 1 avatar per agent, paused agents go to OFF area
+// v10: Agents go to cubicles (working), lounge (idle), or urinals (error/overloaded)
 export function mapAgentsFromAPI(apiAgents) {
   const results = [];
-  let activeIdx = 0;
-  let offIdx = 0;
+  let workIdx = 0;
+  let loungeIdx = 0;
+  let errorIdx = 0;
 
   apiAgents.forEach((agent, idx) => {
+    const status = agent.status || 'idle';
     const isActive = (agent.active_channels || 0) > 0;
-    let desk;
+    
+    // Determine location based on status
+    const isErrorStatus = status === 'error' || status === 'overloaded' || status === 'crashed';
+    const isWorkingStatus = status === 'working' || status === 'responding' || status === 'scheduling' || isActive;
+    
+    let position;
+    let locationType;
 
-    if (isActive) {
-      desk = DESK_POSITIONS[activeIdx % DESK_POSITIONS.length];
-      activeIdx++;
+    if (isErrorStatus) {
+      // Error/overloaded agents go to urinals (bathroom)
+      position = ERROR_POSITIONS[errorIdx % ERROR_POSITIONS.length];
+      errorIdx++;
+      locationType = 'error';
+    } else if (isWorkingStatus) {
+      // Working agents go to their cubicles
+      position = DESK_POSITIONS[workIdx % DESK_POSITIONS.length];
+      workIdx++;
+      locationType = 'work';
     } else {
-      desk = OFF_POSITIONS[offIdx % OFF_POSITIONS.length];
-      offIdx++;
+      // Idle agents go to lounge chairs
+      position = OFF_POSITIONS[loungeIdx % OFF_POSITIONS.length];
+      loungeIdx++;
+      locationType = 'lounge';
     }
 
     results.push({
@@ -89,8 +112,9 @@ export function mapAgentsFromAPI(apiAgents) {
       llm: agent.llm || '',
       empresa: agent.empresa || '',
       color: AGENT_COLORS[idx % AGENT_COLORS.length],
-      deskX: desk.x,
-      deskY: desk.y,
+      deskX: position.x,
+      deskY: position.y,
+      locationType: locationType,
       hasRealData: isActive,
       lastActivity: agent.last_activity || null,
     });

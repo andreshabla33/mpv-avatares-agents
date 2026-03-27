@@ -105,45 +105,52 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── Queries 3-6: Messages ──
-    const { data: recentMsgs5 } = await supabase
-      .from("wp_mensajes")
-      .select("conversacion_id, created_at, remitente, contenido, uso_herramientas")
-      .gte("created_at", fiveMinAgo)
-      .in("conversacion_id", allConvIds.slice(0, 1000))
-      .order("created_at", { ascending: false })
-      .limit(2000);
+    // ── Queries 3-7: Messages and Abandoned Convs in parallel ──
+    const [
+      { data: recentMsgs5 },
+      { data: recentMsgs1h },
+      { data: msgs24h },
+      { data: unansweredMsgs },
+      { data: abandonedConvs }
+    ] = await Promise.all([
+      supabase
+        .from("wp_mensajes")
+        .select("conversacion_id, created_at, remitente, contenido, uso_herramientas")
+        .gte("created_at", fiveMinAgo)
+        .in("conversacion_id", allConvIds.slice(0, 1000))
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      
+      supabase
+        .from("wp_mensajes")
+        .select("conversacion_id, created_at, remitente, contenido")
+        .gte("created_at", oneHourAgo)
+        .in("conversacion_id", allConvIds.slice(0, 1000))
+        .order("created_at", { ascending: false })
+        .limit(2000),
 
-    const { data: recentMsgs1h } = await supabase
-      .from("wp_mensajes")
-      .select("conversacion_id, created_at, remitente, contenido")
-      .gte("created_at", oneHourAgo)
-      .in("conversacion_id", allConvIds.slice(0, 1000))
-      .order("created_at", { ascending: false })
-      .limit(2000);
+      supabase
+        .from("wp_mensajes")
+        .select("conversacion_id, remitente")
+        .gte("created_at", twentyFourHAgo)
+        .in("conversacion_id", allConvIds.slice(0, 1000))
+        .limit(5000),
 
-    const { data: msgs24h } = await supabase
-      .from("wp_mensajes")
-      .select("conversacion_id, remitente")
-      .gte("created_at", twentyFourHAgo)
-      .in("conversacion_id", allConvIds.slice(0, 1000))
-      .limit(5000);
+      supabase
+        .from("wp_mensajes")
+        .select("conversacion_id, created_at, remitente")
+        .gte("created_at", oneHourAgo)
+        .in("conversacion_id", allConvIds.slice(0, 500))
+        .order("created_at", { ascending: false })
+        .limit(2000),
 
-    const { data: unansweredMsgs } = await supabase
-      .from("wp_mensajes")
-      .select("conversacion_id, created_at, remitente")
-      .gte("created_at", oneHourAgo)
-      .in("conversacion_id", allConvIds.slice(0, 500))
-      .order("created_at", { ascending: false })
-      .limit(2000);
-
-    // ── Query 7: Abandoned conversations ──
-    const { data: abandonedConvs } = await supabase
-      .from("wp_conversaciones")
-      .select("id, agente_id, fecha_ultimo_mensaje_usuario")
-      .in("agente_id", agentIds)
-      .gte("fecha_ultimo_mensaje_usuario", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-      .limit(1000);
+      supabase
+        .from("wp_conversaciones")
+        .select("id, agente_id, fecha_ultimo_mensaje_usuario")
+        .in("agente_id", agentIds)
+        .gte("fecha_ultimo_mensaje_usuario", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+        .limit(1000)
+    ]);
 
     // ── Build activity maps keyed by agente_id ──
     type Activity = {

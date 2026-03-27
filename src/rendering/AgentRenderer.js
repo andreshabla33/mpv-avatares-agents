@@ -159,7 +159,7 @@ export class AgentRenderer {
     });
   }
 
-  _renderDebug(ctx, agent, state, frame) {
+  _renderDebug(ctx, agent, state, _frame) {
     ctx.strokeStyle = '#0f0';
     ctx.lineWidth = 1;
     ctx.strokeRect(agent.x - 5, agent.y - 5, 10, 10);

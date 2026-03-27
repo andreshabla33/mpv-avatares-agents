@@ -82,7 +82,7 @@ export class RenderingEngine {
     
     // Render layers in z-order
     const sortedLayers = Array.from(this.layers.entries())
-      .filter(([name, layer]) => layer.enabled)
+      .filter(([_name, layer]) => layer.enabled)
       .sort(([, a], [, b]) => a.zIndex - b.zIndex);
     
     sortedLayers.forEach(([name, layer]) => {
