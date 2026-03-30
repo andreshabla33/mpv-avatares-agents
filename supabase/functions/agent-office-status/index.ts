@@ -60,6 +60,14 @@ Deno.serve(async (req: Request) => {
 
     if (numbersErr) throw numbersErr;
 
+    // ── Query 1b: All active agents (to include agents without numbers) ──
+    const { data: allAgents, error: agentsErr } = await supabase
+      .from("wp_agentes")
+      .select("id, nombre_agente, rol, llm, archivado, empresa_id, wp_empresa_perfil(id, nombre, rubro, pais)")
+      .eq("archivado", false);
+
+    if (agentsErr) throw agentsErr;
+
     // Filter: only numbers with non-archived agents and valid empresa
     const allNumbers = (rawNumbers || []).filter((n: any) =>
       n.wp_agentes && n.wp_empresa_perfil && n.wp_agentes.archivado === false
@@ -77,6 +85,27 @@ Deno.serve(async (req: Request) => {
       if (!agentGroupMap[n.agente_id]) agentGroupMap[n.agente_id] = [];
       agentGroupMap[n.agente_id].push(n);
     }
+
+    // ── Add agents without numbers (from allAgents) ──
+    const agentIdsWithNumbers = new Set(Object.keys(agentGroupMap).map(Number));
+    for (const agent of (allAgents || [])) {
+      if (!agentIdsWithNumbers.has(agent.id)) {
+        // Create a synthetic number entry for agents without numbers
+        agentGroupMap[agent.id] = [{
+          id: null,
+          agente_id: agent.id,
+          telefono: null,
+          nombre: agent.nombre_agente,
+          activo: true,
+          empresa_id: agent.empresa_id,
+          canal: null,
+          timezone: null,
+          wp_agentes: agent,
+          wp_empresa_perfil: agent.wp_empresa_perfil
+        }];
+      }
+    }
+
     const agentIds = Object.keys(agentGroupMap).map(Number);
 
     // ── Query 2: Conversations ──
