@@ -99,7 +99,12 @@ export function useAgentStates(pollInterval = 5000) {
 
   const fetchStates = useCallback(async () => {
     try {
-      const res = await fetch(API_URL);
+      const res = await fetch(API_URL, {
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+      });
       if (!res.ok) throw new Error('API error');
       const data = await res.json();
 
@@ -248,8 +253,9 @@ export function useAgentStates(pollInterval = 5000) {
       .channel('public:wp_mensajes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'wp_mensajes' }, (payload) => {
          // Instant visual feedback for the agent who owns this conversation
-         const agentId = payload.new.agente_id;
-         if (agentId) {
+         const rawId = payload.new.agente_id;
+         if (rawId) {
+             const agentId = `agent-${rawId}`;
              setStates(prev => ({
                  ...prev,
                  [agentId]: payload.new.remitente === 'agente' ? 'responding' : 'thinking'

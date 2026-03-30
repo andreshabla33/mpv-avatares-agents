@@ -184,6 +184,84 @@ async function decodeFurnitureFromPng(
   return sprites;
 }
 
+// ── Procedural Fallback Generators ─────────────────────────────────────────────
+
+function generateFallbackCharacter(bodyColor: string): CharacterDirectionSprites {
+  const makeFrame = (legShift: number): string[][] => {
+    const frame: string[][] = [];
+    for (let y = 0; y < CHAR_FRAME_H; y++) {
+      const row: string[] = [];
+      for (let x = 0; x < CHAR_FRAME_W; x++) {
+        const cx = 8;
+        // Head (rows 4-9)
+        if (y >= 4 && y <= 9 && x >= cx - 3 && x <= cx + 2) {
+          if (y === 7 && (x === cx - 2 || x === cx + 1)) row.push('#222222');
+          else row.push('#FFCCAA');
+        }
+        // Body (rows 10-19)
+        else if (y >= 10 && y <= 19 && x >= cx - 4 && x <= cx + 3) {
+          row.push(bodyColor);
+        }
+        // Left leg (rows 20-27)
+        else if (y >= 20 && y <= 27 && x >= 5 + legShift && x <= 7 + legShift) {
+          row.push('#334466');
+        }
+        // Right leg (rows 20-27)
+        else if (y >= 20 && y <= 27 && x >= 9 - legShift && x <= 11 - legShift) {
+          row.push('#334466');
+        }
+        else {
+          row.push('');
+        }
+      }
+      frame.push(row);
+    }
+    return frame;
+  };
+  const frames: string[][][] = [];
+  for (let f = 0; f < CHAR_FRAMES_PER_ROW; f++) {
+    frames.push(makeFrame(f % 2 === 0 ? 0 : (f % 4 < 2 ? 1 : -1)));
+  }
+  return { down: frames, up: [...frames], right: [...frames] };
+}
+
+function generateFallbackCharacters(): CharacterDirectionSprites[] {
+  const colors = ['#4ecdc4', '#ff6b6b', '#ffe66d', '#a29bfe', '#fd79a8', '#00cec9'];
+  return colors.map((c) => generateFallbackCharacter(c));
+}
+
+function generateFallbackFloors(): string[][][] {
+  const colors = ['#2a2a3e', '#333350', '#2d2d45', '#28283c', '#303048', '#2b2b40', '#272738', '#2e2e48', '#323250'];
+  return colors.map((baseColor) => {
+    const tile: string[][] = [];
+    for (let y = 0; y < FLOOR_TILE_SIZE; y++) {
+      const row: string[] = [];
+      for (let x = 0; x < FLOOR_TILE_SIZE; x++) {
+        row.push(baseColor);
+      }
+      tile.push(row);
+    }
+    return tile;
+  });
+}
+
+function generateFallbackWalls(): string[][][][] {
+  const wallColor = '#4a4a6a';
+  const set: string[][][] = [];
+  for (let mask = 0; mask < WALL_BITMASK_COUNT; mask++) {
+    const piece: string[][] = [];
+    for (let y = 0; y < WALL_PIECE_HEIGHT; y++) {
+      const row: string[] = [];
+      for (let x = 0; x < WALL_PIECE_WIDTH; x++) {
+        row.push(y < 2 || y >= WALL_PIECE_HEIGHT - 1 ? '#5a5a7a' : wallColor);
+      }
+      piece.push(row);
+    }
+    set.push(piece);
+  }
+  return [set];
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
@@ -196,10 +274,18 @@ export async function initBrowserMock(): Promise<void> {
 
   const base = import.meta.env.BASE_URL; // '/' in dev, '/sub/' with a subpath, './' in production
 
-  const [assetIndex, catalog] = await Promise.all([
-    fetch(`${base}assets/asset-index.json`).then((r) => r.json()) as Promise<AssetIndex>,
-    fetch(`${base}assets/furniture-catalog.json`).then((r) => r.json()) as Promise<CatalogEntry[]>,
-  ]);
+  let assetIndex: AssetIndex;
+  let catalog: CatalogEntry[];
+  try {
+    [assetIndex, catalog] = await Promise.all([
+      fetch(`${base}assets/asset-index.json`).then((r) => r.json()) as Promise<AssetIndex>,
+      fetch(`${base}assets/furniture-catalog.json`).then((r) => r.json()) as Promise<CatalogEntry[]>,
+    ]);
+  } catch (err) {
+    console.warn('[BrowserMock] Failed to load asset index, using empty defaults:', err);
+    assetIndex = { characters: [], floors: [], walls: [], defaultLayout: 'default-layout-1.json' } as unknown as AssetIndex;
+    catalog = [];
+  }
 
   const shouldTryDecoded = import.meta.env.DEV;
   const [decodedCharacters, decodedFloors, decodedWalls, decodedFurniture] = shouldTryDecoded
@@ -213,26 +299,55 @@ export async function initBrowserMock(): Promise<void> {
 
   const hasDecoded = !!(decodedCharacters && decodedFloors && decodedWalls && decodedFurniture);
 
-  if (!hasDecoded) {
-    if (shouldTryDecoded) {
-      console.log('[BrowserMock] Decoded JSON not found, decoding PNG assets in browser...');
-    } else {
-      console.log('[BrowserMock] Decoding PNG assets in browser...');
+  let characters: CharacterDirectionSprites[];
+  let floorSprites: string[][][];
+  let wallSets: string[][][][];
+  let furnitureSprites: Record<string, string[][]>;
+
+  if (hasDecoded) {
+    characters = decodedCharacters!;
+    floorSprites = decodedFloors!;
+    wallSets = decodedWalls!;
+    furnitureSprites = decodedFurniture!;
+  } else {
+    // Try PNG decode, fall back to procedural generation per asset type
+    try {
+      characters = await decodeCharactersFromPng(base, assetIndex);
+    } catch (err) {
+      console.warn('[BrowserMock] Character PNGs missing, generating procedural fallbacks:', (err as Error).message);
+      characters = generateFallbackCharacters();
+    }
+
+    try {
+      floorSprites = await decodeFloorsFromPng(base, assetIndex);
+    } catch (err) {
+      console.warn('[BrowserMock] Floor PNGs missing, generating procedural fallbacks:', (err as Error).message);
+      floorSprites = generateFallbackFloors();
+    }
+
+    try {
+      wallSets = await decodeWallsFromPng(base, assetIndex);
+    } catch (err) {
+      console.warn('[BrowserMock] Wall PNGs missing, generating procedural fallbacks:', (err as Error).message);
+      wallSets = generateFallbackWalls();
+    }
+
+    try {
+      furnitureSprites = await decodeFurnitureFromPng(base, catalog);
+    } catch (err) {
+      console.warn('[BrowserMock] Furniture PNGs missing, using empty set:', (err as Error).message);
+      furnitureSprites = {};
     }
   }
 
-  const [characters, floorSprites, wallSets, furnitureSprites] = hasDecoded
-    ? [decodedCharacters!, decodedFloors!, decodedWalls!, decodedFurniture!]
-    : await Promise.all([
-        decodeCharactersFromPng(base, assetIndex),
-        decodeFloorsFromPng(base, assetIndex),
-        decodeWallsFromPng(base, assetIndex),
-        decodeFurnitureFromPng(base, catalog),
-      ]);
-
-  const layout = assetIndex.defaultLayout
-    ? await fetch(`${base}assets/${assetIndex.defaultLayout}`).then((r) => r.json())
-    : null;
+  let layout: unknown = null;
+  try {
+    if (assetIndex.defaultLayout) {
+      layout = await fetch(`${base}assets/${assetIndex.defaultLayout}`).then((r) => r.json());
+    }
+  } catch (err) {
+    console.warn('[BrowserMock] Default layout failed to load:', (err as Error).message);
+  }
 
   mockPayload = {
     characters,
@@ -243,8 +358,9 @@ export async function initBrowserMock(): Promise<void> {
     layout,
   };
 
+  const source = hasDecoded ? 'decoded-json' : 'png+fallback';
   console.log(
-    `[BrowserMock] Ready (${hasDecoded ? 'decoded-json' : 'browser-png-decode'}) — ${characters.length} chars, ${floorSprites.length} floors, ${wallSets.length} wall sets, ${catalog.length} furniture items`,
+    `[BrowserMock] Ready (${source}) — ${characters.length} chars, ${floorSprites.length} floors, ${wallSets.length} wall sets, ${catalog.length} furniture items`,
   );
 }
 
