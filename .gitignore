@@ -29,3 +29,6 @@ dist-ssr
 screenshot*.png
 temp_*.txt
 pixeloffice_content.txt
+
+# Security Audit Folder
+CONFIDENCIAL NO COMMITEAR/

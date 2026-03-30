@@ -284,5 +284,17 @@ export function useAgentStates(pollInterval = 5000) {
   // Check if data is stale (> 15 seconds without a successful fetch)
   const isStale = apiAvailable && (Date.now() - lastFetch > 15000);
 
-  return { agents, states, extras, kpis, activityLog, apiAvailable, isStale };
+  // Function to update agent departments based on current status
+  const updateAgentDepartments = useCallback((officeState) => {
+    if (!officeState) return;
+    
+    agents.forEach(agent => {
+      const status = states[agent.id];
+      if (status) {
+        officeState.setAgentDepartmentByStatus(agent.id, status);
+      }
+    });
+  }, [agents, states]);
+
+  return { agents, states, extras, kpis, activityLog, apiAvailable, isStale, updateAgentDepartments };
 }

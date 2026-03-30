@@ -24,6 +24,8 @@ import {
 import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap';
 import type {
   Character,
+  Department,
+  DepartmentId,
   FurnitureInstance,
   OfficeLayout,
   PlacedFurniture,
@@ -33,6 +35,7 @@ import type {
 import { CharacterState, Direction, MATRIX_EFFECT_DURATION, TILE_SIZE } from '../types';
 import { createCharacter, updateCharacter } from './characters';
 import { matrixEffectSeeds } from './matrixEffect';
+import { getDepartments, getDepartmentForStatus, getRandomTileInDepartment } from '../layout/departments';
 
 export class OfficeState {
   layout: OfficeLayout;
@@ -42,6 +45,9 @@ export class OfficeState {
   furniture: FurnitureInstance[];
   walkableTiles: Array<{ col: number; row: number }>;
   characters: Map<number, Character> = new Map();
+  departments: Department[] = [];
+  /** Track current department assignment for each agent */
+  agentDepartments: Map<number, DepartmentId> = new Map();
   /** Accumulated time for furniture animation frame cycling */
   furnitureAnimTimer = 0;
   selectedAgentId: number | null = null;
@@ -61,6 +67,8 @@ export class OfficeState {
     this.blockedTiles = getBlockedTiles(this.layout.furniture);
     this.furniture = layoutToFurnitureInstances(this.layout.furniture);
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles);
+    // Initialize departments based on layout size
+    this.departments = getDepartments(this.layout.cols, this.layout.rows);
   }
 
   /** Rebuild all derived state from a new layout. Reassigns existing characters.
@@ -714,5 +722,109 @@ export class OfficeState {
       }
     }
     return null;
+  }
+
+  /** Update agent's department based on their current status */
+  setAgentDepartmentByStatus(agentId: number, status: string): void {
+    const ch = this.characters.get(agentId);
+    if (!ch) return;
+
+    const departmentId = getDepartmentForStatus(status);
+    const currentDeptId = this.agentDepartments.get(agentId);
+
+    // Only move if department changed
+    if (currentDeptId !== departmentId) {
+      this.agentDepartments.set(agentId, departmentId);
+      this.sendToDepartment(agentId, departmentId);
+    }
+  }
+
+  /** Send an agent to a specific department zone */
+  sendToDepartment(agentId: number, departmentId: DepartmentId): boolean {
+    const ch = this.characters.get(agentId);
+    if (!ch || ch.isSubagent) return false;
+
+    const department = this.departments.find((d) => d.id === departmentId);
+    if (!department) return false;
+
+    // Get a random tile in the department zone
+    const targetTile = getRandomTileInDepartment(department);
+    if (!targetTile) return false;
+
+    // Pathfind to the target tile
+    const path = this.withOwnSeatUnblocked(ch, () =>
+      findPath(ch.tileCol, ch.tileRow, targetTile.col, targetTile.row, this.tileMap, this.blockedTiles),
+    );
+
+    if (path.length > 0) {
+      ch.path = path;
+      ch.moveProgress = 0;
+      ch.state = CharacterState.WALK;
+      ch.frame = 0;
+      ch.frameTimer = 0;
+      return true;
+    }
+
+    // If no path, try to find nearest walkable tile in department
+    const nearestTile = this.findNearestWalkableTileInDepartment(ch.tileCol, ch.tileRow, department);
+    if (nearestTile) {
+      const altPath = this.withOwnSeatUnblocked(ch, () =>
+        findPath(ch.tileCol, ch.tileRow, nearestTile.col, nearestTile.row, this.tileMap, this.blockedTiles),
+      );
+      if (altPath.length > 0) {
+        ch.path = altPath;
+        ch.moveProgress = 0;
+        ch.state = CharacterState.WALK;
+        ch.frame = 0;
+        ch.frameTimer = 0;
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /** Find the nearest walkable tile within a department */
+  private findNearestWalkableTileInDepartment(
+    col: number,
+    row: number,
+    department: Department,
+  ): { col: number; row: number } | null {
+    let nearest: { col: number; row: number } | null = null;
+    let minDist = Infinity;
+
+    for (const tile of department.zoneTiles) {
+      const dist = Math.abs(tile.col - col) + Math.abs(tile.row - row);
+      if (dist < minDist && isWalkable(tile.col, tile.row, this.tileMap, this.blockedTiles)) {
+        minDist = dist;
+        nearest = tile;
+      }
+    }
+
+    return nearest;
+  }
+
+  /** Get current department for an agent */
+  getAgentDepartment(agentId: number): DepartmentId | null {
+    return this.agentDepartments.get(agentId) || null;
+  }
+
+  /** Get all departments */
+  getDepartments(): Department[] {
+    return this.departments;
+  }
+
+  /** Check if an agent is in their assigned department */
+  isAgentInDepartment(agentId: number): boolean {
+    const ch = this.characters.get(agentId);
+    if (!ch) return false;
+
+    const deptId = this.agentDepartments.get(agentId);
+    if (!deptId) return false;
+
+    const department = this.departments.find((d) => d.id === deptId);
+    if (!department) return false;
+
+    return department.zoneTiles.some((tile) => tile.col === ch.tileCol && tile.row === ch.tileRow);
   }
 }

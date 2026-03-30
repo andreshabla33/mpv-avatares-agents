@@ -51,6 +51,26 @@ export const Direction = {
 } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
 
+/** Department types for organizing agents by their current activity */
+export const DepartmentId = {
+  RESPONDING: 'responding',     // Respondiendo mensajes - Blue
+  QUALIFYING: 'qualifying',     // Calificando lead - Orange/Yellow
+  SCHEDULING: 'scheduling',     // Agendando cita - Green
+  REST: 'rest',                 // Descanso - Gray/Purple
+} as const;
+export type DepartmentId = (typeof DepartmentId)[keyof typeof DepartmentId];
+
+/** Department definition with visual properties */
+export interface Department {
+  id: DepartmentId;
+  name: string;
+  color: string;        // Hex color for zone
+  colorLight: string;   // Lighter variant for floor
+  textColor: string;    // Text color for labels
+  zoneTiles: Array<{ col: number; row: number }>;  // Walkable tiles in this zone
+  labelPosition: { col: number; row: number };     // Where to draw department label
+}
+
 /** 2D array of hex color strings: '' = transparent, '#RRGGBB' = opaque, '#RRGGBBAA' = semi-transparent. [row][col] */
 export type SpriteData = string[][];
 
