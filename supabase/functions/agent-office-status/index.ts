@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
     const twentyFourHAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
-    // ── Query 1: All numbers with agent + empresa info ──
+    // ── Query 1: All ACTIVE numbers (activo = TRUE) with agent + empresa info ──
     const { data: rawNumbers, error: numbersErr } = await supabase
       .from("wp_numeros")
       .select(`
@@ -55,18 +55,11 @@ Deno.serve(async (req: Request) => {
         wp_agentes!wp_numeros_agente_id_fkey(id, nombre_agente, rol, llm, archivado),
         wp_empresa_perfil!wp_numeros_empresa_id_fkey(id, nombre, rubro, pais)
       `)
+      .eq("activo", true)  // Only active numbers
       .order("empresa_id")
       .order("agente_id");
 
     if (numbersErr) throw numbersErr;
-
-    // ── Query 1b: All active agents (to include agents without numbers) ──
-    const { data: allAgents, error: agentsErr } = await supabase
-      .from("wp_agentes")
-      .select("id, nombre_agente, rol, llm, archivado, empresa_id, wp_empresa_perfil(id, nombre, rubro, pais)")
-      .eq("archivado", false);
-
-    if (agentsErr) throw agentsErr;
 
     // Filter: only numbers with non-archived agents and valid empresa
     const allNumbers = (rawNumbers || []).filter((n: any) =>
@@ -79,57 +72,57 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ── Group numbers by agente_id → 1 avatar per agent ──
-    const agentGroupMap: Record<number, any[]> = {};
+    // ── Group numbers by empresa_id → 1 avatar per empresa ──
+    const empresaGroupMap: Record<number, any[]> = {};
     for (const n of allNumbers) {
-      if (!agentGroupMap[n.agente_id]) agentGroupMap[n.agente_id] = [];
-      agentGroupMap[n.agente_id].push(n);
+      if (!empresaGroupMap[n.empresa_id]) empresaGroupMap[n.empresa_id] = [];
+      empresaGroupMap[n.empresa_id].push(n);
     }
 
-    // ── Add agents without numbers (from allAgents) ──
-    const agentIdsWithNumbers = new Set(Object.keys(agentGroupMap).map(Number));
-    for (const agent of (allAgents || [])) {
-      if (!agentIdsWithNumbers.has(agent.id)) {
-        // Create a synthetic number entry for agents without numbers
-        agentGroupMap[agent.id] = [{
-          id: null,
-          agente_id: agent.id,
-          telefono: null,
-          nombre: agent.nombre_agente,
-          activo: true,
-          empresa_id: agent.empresa_id,
-          canal: null,
-          timezone: null,
-          wp_agentes: agent,
-          wp_empresa_perfil: agent.wp_empresa_perfil
-        }];
+    const empresaIds = Object.keys(empresaGroupMap).map(Number);
+
+    // ── Query 2: Conversations (for all agents in these empresas) ──
+    // Get all agent IDs from all empresas
+    const allAgentIdsInEmpresas = new Set<number>();
+    for (const numbers of Object.values(empresaGroupMap)) {
+      for (const n of numbers) {
+        if (n.agente_id) allAgentIdsInEmpresas.add(n.agente_id);
       }
     }
+    const agentIdsArray = Array.from(allAgentIdsInEmpresas);
 
-    const agentIds = Object.keys(agentGroupMap).map(Number);
-
-    // ── Query 2: Conversations ──
     const { data: convData } = await supabase
       .from("wp_conversaciones")
       .select("id, agente_id, canal, seguimiento, fecha_ultimo_mensaje_usuario, contacto_id")
-      .in("agente_id", agentIds)
+      .in("agente_id", agentIdsArray)
       .order("fecha_ultimo_mensaje_usuario", { ascending: false })
       .limit(500);
 
+    // Build maps keyed by empresa_id (aggregate conversations from all agents in empresa)
     const lastConvMap: Record<number, { canal: string; last_activity: string }> = {};
     const openConvsCount: Record<number, number> = {};
-    const convIdToAgent: Record<number, number> = {};
+    const convIdToEmpresa: Record<number, number> = {};
     const allConvIds: number[] = [];
+
+    // Map agent_id to empresa_id for quick lookup
+    const agentToEmpresaMap: Record<number, number> = {};
+    for (const [empresaId, numbers] of Object.entries(empresaGroupMap)) {
+      for (const n of numbers) {
+        if (n.agente_id) agentToEmpresaMap[n.agente_id] = Number(empresaId);
+      }
+    }
 
     if (convData) {
       for (const c of convData) {
-        convIdToAgent[c.id] = c.agente_id;
+        const empresaId = agentToEmpresaMap[c.agente_id];
+        if (!empresaId) continue; // Skip conversations from agents not in our empresas
+        convIdToEmpresa[c.id] = empresaId;
         allConvIds.push(c.id);
-        if (!lastConvMap[c.agente_id]) {
-          lastConvMap[c.agente_id] = { canal: c.canal, last_activity: c.fecha_ultimo_mensaje_usuario };
+        if (!lastConvMap[empresaId]) {
+          lastConvMap[empresaId] = { canal: c.canal, last_activity: c.fecha_ultimo_mensaje_usuario };
         }
         if (c.seguimiento === 'abierta') {
-          openConvsCount[c.agente_id] = (openConvsCount[c.agente_id] || 0) + 1;
+          openConvsCount[empresaId] = (openConvsCount[empresaId] || 0) + 1;
         }
       }
     }
@@ -176,12 +169,12 @@ Deno.serve(async (req: Request) => {
       supabase
         .from("wp_conversaciones")
         .select("id, agente_id, fecha_ultimo_mensaje_usuario")
-        .in("agente_id", agentIds)
+        .in("agente_id", agentIdsArray)
         .gte("fecha_ultimo_mensaje_usuario", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
         .limit(1000)
     ]);
 
-    // ── Build activity maps keyed by agente_id ──
+    // ── Build activity maps keyed by empresa_id ──
     type Activity = {
       msgs_2min_agent: number; msgs_2min_user: number;
       msgs_5min_agent: number; msgs_5min_user: number;
@@ -191,10 +184,10 @@ Deno.serve(async (req: Request) => {
       thought_traces: any[]; unanswered_msgs: number; abandoned_convs: number;
       last_agent_message_time: string | null; minutes_without_response: number;
     };
-    const agentActivity: Record<number, Activity> = {};
+    const empresaActivity: Record<number, Activity> = {};
 
-    for (const agId of agentIds) {
-      agentActivity[agId] = {
+    for (const empId of empresaIds) {
+      empresaActivity[empId] = {
         msgs_2min_agent: 0, msgs_2min_user: 0,
         msgs_5min_agent: 0, msgs_5min_user: 0,
         msgs_1h: 0, msgs_24h_agent: 0, msgs_24h_user: 0,
@@ -210,9 +203,9 @@ Deno.serve(async (req: Request) => {
     // Process 5min messages
     if (recentMsgs5) {
       for (const m of recentMsgs5) {
-        const agId = convIdToAgent[m.conversacion_id];
-        if (!agId || !agentActivity[agId]) continue;
-        const act = agentActivity[agId];
+        const empId = convIdToEmpresa[m.conversacion_id];
+        if (!empId || !empresaActivity[empId]) continue;
+        const act = empresaActivity[empId];
         const isRecent = new Date(m.created_at).getTime() > new Date(twoMinAgo).getTime();
 
         if (m.remitente === 'agente') {
@@ -246,20 +239,20 @@ Deno.serve(async (req: Request) => {
     // Process 1h messages
     if (recentMsgs1h) {
       for (const m of recentMsgs1h) {
-        const agId = convIdToAgent[m.conversacion_id];
-        if (!agId || !agentActivity[agId]) continue;
-        agentActivity[agId].msgs_1h++;
-        agentActivity[agId].tokens_1h += estimateTokens(m.contenido);
+        const empId = convIdToEmpresa[m.conversacion_id];
+        if (!empId || !empresaActivity[empId]) continue;
+        empresaActivity[empId].msgs_1h++;
+        empresaActivity[empId].tokens_1h += estimateTokens(m.contenido);
       }
     }
 
     // Process 24h messages
     if (msgs24h) {
       for (const m of msgs24h) {
-        const agId = convIdToAgent[m.conversacion_id];
-        if (!agId || !agentActivity[agId]) continue;
-        if (m.remitente === 'agente') agentActivity[agId].msgs_24h_agent++;
-        else agentActivity[agId].msgs_24h_user++;
+        const empId = convIdToEmpresa[m.conversacion_id];
+        if (!empId || !empresaActivity[empId]) continue;
+        if (m.remitente === 'agente') empresaActivity[empId].msgs_24h_agent++;
+        else empresaActivity[empId].msgs_24h_user++;
       }
     }
 
@@ -277,10 +270,10 @@ Deno.serve(async (req: Request) => {
       }
       for (const convId of Object.keys(convLastUserMsg)) {
         const cid = Number(convId);
-        const agId = convIdToAgent[cid];
-        if (!agId || !agentActivity[agId]) continue;
+        const empId = convIdToEmpresa[cid];
+        if (!empId || !empresaActivity[empId]) continue;
         if (convLastUserMsg[cid] > (convLastAgentMsg[cid] || 0) && (Date.now() - convLastUserMsg[cid]) > 5 * 60 * 1000) {
-          agentActivity[agId].unanswered_msgs++;
+          empresaActivity[empId].unanswered_msgs++;
         }
       }
     }
@@ -288,9 +281,10 @@ Deno.serve(async (req: Request) => {
     // Process abandoned conversations
     if (abandonedConvs) {
       for (const conv of abandonedConvs) {
-        if (!agentActivity[conv.agente_id]) continue;
+        const empId = agentToEmpresaMap[conv.agente_id];
+        if (!empId || !empresaActivity[empId]) continue;
         const userLastMsg = conv.fecha_ultimo_mensaje_usuario ? new Date(conv.fecha_ultimo_mensaje_usuario).getTime() : 0;
-        if ((Date.now() - userLastMsg) > 2 * 60 * 60 * 1000) agentActivity[conv.agente_id].abandoned_convs++;
+        if ((Date.now() - userLastMsg) > 2 * 60 * 60 * 1000) empresaActivity[empId].abandoned_convs++;
       }
     }
 
@@ -308,10 +302,10 @@ Deno.serve(async (req: Request) => {
       }
       for (const convId of Object.keys(convLastUserMsg2)) {
         const cid = Number(convId);
-        const agId = convIdToAgent[cid];
-        if (!agId || !agentActivity[agId]) continue;
+        const empId = convIdToEmpresa[cid];
+        if (!empId || !empresaActivity[empId]) continue;
         if (convLastUserMsg2[cid] > (convLastAgentReply[cid] || 0) && (Date.now() - convLastUserMsg2[cid]) > 90 * 1000) {
-          agentActivity[agId].waiting_reply = true;
+          empresaActivity[empId].waiting_reply = true;
         }
       }
     }
@@ -339,8 +333,8 @@ Deno.serve(async (req: Request) => {
 
     // Calculate minutes without response
     const currentTime = Date.now();
-    for (const agId of agentIds) {
-      const act = agentActivity[agId];
+    for (const empId of empresaIds) {
+      const act = empresaActivity[empId];
       if (act.last_agent_message_time) {
         act.minutes_without_response = Math.floor((currentTime - new Date(act.last_agent_message_time).getTime()) / (1000 * 60));
       } else {
@@ -348,22 +342,15 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── Build final response: 1 avatar per agent ──
-    const results = agentIds.map((agId) => {
-      const numbers = agentGroupMap[agId];
-      const firstNum = numbers[0]; // Use first number for agent-level info
-      const act = agentActivity[agId];
-      const conv = lastConvMap[agId];
-      const openConvs = openConvsCount[agId] || 0;
+    // ── Build final response: 1 avatar per empresa ──
+    const results = empresaIds.map((empId) => {
+      const numbers = empresaGroupMap[empId];
+      const firstNum = numbers[0]; // Use first number for empresa-level info
+      const act = empresaActivity[empId];
+      const conv = lastConvMap[empId];
+      const openConvs = openConvsCount[empId] || 0;
 
-      // Count active/paused channels
-      const activeNums = numbers.filter((n: any) => n.activo === true);
-      const pausedNums = numbers.filter((n: any) => n.activo !== true);
-      const activeChannels = activeNums.length;
-      const pausedChannels = pausedNums.length;
-      const allPaused = activeChannels === 0;
-
-      // Build channels array
+      // Build channels array with all active canales
       const channels = numbers.map((n: any) => ({
         numero_id: n.id,
         canal: n.canal,
@@ -374,35 +361,33 @@ Deno.serve(async (req: Request) => {
         nombre: n.nombre,
       }));
 
-      // Determine status: if all channels paused → paused; otherwise use activity
+      // Get unique active canales for display
+      const activeCanales = [...new Set(numbers.map((n: any) => n.canal).filter(Boolean))];
+
+      // Determine status based on empresa activity
       let status: string;
       let action_text: string;
-      if (allPaused) {
-        status = 'paused';
-        action_text = 'Todos los canales inactivos';
-      } else {
-        const result = getNumeroStatus(act, openConvs);
-        status = result.status;
-        action_text = result.action_text;
-      }
+      const result = getNumeroStatus(act, openConvs);
+      status = result.status;
+      action_text = result.action_text;
 
       return {
-        id: `agent-${agId}`,
-        agente_id: agId,
-        name: firstNum.wp_agentes.nombre_agente,
-        nombre_agente: firstNum.wp_agentes.nombre_agente,
+        id: `empresa-${empId}`,
+        empresa_id: empId,
+        name: firstNum.wp_empresa_perfil.nombre,
+        nombre_agente: firstNum.wp_empresa_perfil.nombre,
         empresa: firstNum.wp_empresa_perfil.nombre,
         rubro: firstNum.wp_empresa_perfil.rubro || '',
         pais: firstNum.wp_empresa_perfil.pais || '',
-        role: firstNum.wp_agentes.rol || 'General',
-        llm: firstNum.wp_agentes.llm,
+        role: 'Empresa',
+        canales: activeCanales,
+        canales_display: activeCanales.join(', '),
         status,
         action_text,
         // Channel info
         channels,
-        active_channels: activeChannels,
-        paused_channels: pausedChannels,
-        // Activity metrics (aggregated across all active channels)
+        active_channels: channels.length,
+        // Activity metrics (aggregated across all channels)
         msgs_2min: act.msgs_2min_agent,
         msgs_5min: act.msgs_5min_agent,
         msgs_1h: act.msgs_1h,
@@ -419,7 +404,7 @@ Deno.serve(async (req: Request) => {
         abandoned_convs: act.abandoned_convs,
         last_agent_message_time: act.last_agent_message_time,
         minutes_without_response: act.minutes_without_response,
-        number_is_active: activeChannels > 0,
+        number_is_active: true,
       };
     });
 
