@@ -5,22 +5,22 @@ import App from './App.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 import { initBrowserMock } from './office2d/browserMock'
 
+// Start React immediately - don't wait for assets
+const root = createRoot(document.getElementById('root'));
+
+root.render(
+  <StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </StrictMode>,
+);
+
+// Load assets in background (non-blocking)
 initBrowserMock()
   .then(() => {
-    createRoot(document.getElementById('root')).render(
-      <StrictMode>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </StrictMode>,
-    )
+    console.log('[Main] Assets loaded successfully in background');
   })
   .catch((err) => {
-    console.error("Initialization failed:", err);
-    createRoot(document.getElementById('root')).render(
-      <div style={{ color: 'red', padding: '20px', fontFamily: 'monospace' }}>
-        <h1>Initialization Error</h1>
-        <pre>{err.stack || String(err)}</pre>
-      </div>
-    );
+    console.error('[Main] Asset loading failed:', err);
   });

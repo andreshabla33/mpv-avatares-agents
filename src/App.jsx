@@ -11,7 +11,26 @@ function App() {
   const { playSound, toggleSounds, isEnabled: _isEnabled } = useSounds()
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [soundOn, setSoundOn] = useState(true)
+  const [assetsReady, setAssetsReady] = useState(false)
   const prevStatesRef = useRef({})
+
+  // Check when assets are loaded
+  useEffect(() => {
+    const checkAssets = () => {
+      // Check if browserMock has loaded assets
+      if (window.browserMockReady || document.querySelector('canvas')) {
+        setAssetsReady(true)
+      }
+    }
+    
+    // Check immediately and after a short delay
+    checkAssets()
+    const timer = setTimeout(() => {
+      setAssetsReady(true)
+    }, 500) // Show UI after 500ms regardless
+    
+    return () => clearTimeout(timer)
+  }, [])
 
   // Play sounds on state transitions
   useEffect(() => {
@@ -77,15 +96,28 @@ function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-        {/* Canvas container */}
+        {/* Canvas container - show loading state */}
         <div className="flex-1 relative min-h-0 bg-black">
-          <PixelOffice
-            agents={agents}
-            states={states}
-            extras={extras}
-            kpis={kpis}
-            onAgentClick={handleAgentClick}
-          />
+          {!assetsReady ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+              <div className="text-2xl font-bold mb-4">CARGANDO OFICINA...</div>
+              <div className="flex gap-2">
+                <span className="animate-bounce">[</span>
+                <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>■</span>
+                <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>■</span>
+                <span className="animate-bounce" style={{ animationDelay: '0.3s' }}>■</span>
+                <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>]</span>
+              </div>
+            </div>
+          ) : (
+            <PixelOffice
+              agents={agents}
+              states={states}
+              extras={extras}
+              kpis={kpis}
+              onAgentClick={handleAgentClick}
+            />
+          )}
         </div>
 
         {/* Side Panel */}

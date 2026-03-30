@@ -362,6 +362,9 @@ export async function initBrowserMock(): Promise<void> {
   console.log(
     `[BrowserMock] Ready (${source}) — ${characters.length} chars, ${floorSprites.length} floors, ${wallSets.length} wall sets, ${catalog.length} furniture items`,
   );
+
+  // Signal that assets are ready for App.jsx loading state
+  (window as any).browserMockReady = true;
 }
 
 /**
