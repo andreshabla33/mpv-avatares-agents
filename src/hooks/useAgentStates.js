@@ -4,6 +4,15 @@ import { mapAgentsFromAPI, getFallbackAgents } from '../data/agents';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing Supabase environment variables. ' +
+    'Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your Netlify environment variables. ' +
+    'Current values: URL=' + (SUPABASE_URL ? 'set' : 'MISSING') + ', KEY=' + (SUPABASE_ANON_KEY ? 'set' : 'MISSING')
+  );
+}
+
 const FUNCTION_NAME = 'agent-office-status';
 const API_URL = `${SUPABASE_URL}/functions/v1/${FUNCTION_NAME}`;
 

@@ -2,6 +2,11 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  VITE_SUPABASE_URL = "https://vecspltvmyopwbjzerow.supabase.co"
+  # VITE_SUPABASE_ANON_KEY must be set in Netlify UI (Site settings > Environment variables)
+  # Do NOT commit the actual key here for security
+
 [[headers]]
   for = "/*"
   [headers.values]
