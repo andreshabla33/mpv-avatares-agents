@@ -250,6 +250,7 @@ export function OfficeCanvas({
           hoveredTile: officeState.hoveredTile,
           seats: officeState.seats,
           characters: officeState.characters,
+          departments: officeState.departments,
         };
 
         const { offsetX, offsetY } = renderFrame(

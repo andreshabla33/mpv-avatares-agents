@@ -40,6 +40,7 @@ import {
 } from '../sprites/spriteData';
 import type {
   Character,
+  Department,
   FloorColor,
   FurnitureInstance,
   Seat,
@@ -558,6 +559,64 @@ export interface SelectionRenderState {
   hoveredTile: { col: number; row: number } | null;
   seats: Map<string, Seat>;
   characters: Map<number, Character>;
+  departments?: Department[];
+}
+
+// ── Department visual rendering ─────────────────────────────────────
+
+export function renderDepartments(
+  ctx: CanvasRenderingContext2D,
+  departments: Department[],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): void {
+  for (const dept of departments) {
+    // Draw zone tiles with department color overlay
+    ctx.save();
+    
+    for (const tile of dept.zoneTiles) {
+      const x = offsetX + tile.col * TILE_SIZE * zoom;
+      const y = offsetY + tile.row * TILE_SIZE * zoom;
+      const size = TILE_SIZE * zoom;
+      
+      // Semi-transparent color overlay
+      ctx.fillStyle = dept.colorLight + '40'; // 25% opacity
+      ctx.fillRect(x, y, size, size);
+      
+      // Border
+      ctx.strokeStyle = dept.color;
+      ctx.lineWidth = Math.max(1, zoom * 0.5);
+      ctx.strokeRect(x, y, size, size);
+    }
+    
+    // Draw department label
+    if (dept.labelPosition) {
+      const labelX = offsetX + dept.labelPosition.col * TILE_SIZE * zoom;
+      const labelY = offsetY + dept.labelPosition.row * TILE_SIZE * zoom;
+      
+      ctx.font = `bold ${Math.max(12, 16 * zoom)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Text background
+      const textMetrics = ctx.measureText(dept.name);
+      const padding = 8 * zoom;
+      ctx.fillStyle = dept.color;
+      ctx.fillRect(
+        labelX - textMetrics.width / 2 - padding,
+        labelY - 10 * zoom - padding,
+        textMetrics.width + padding * 2,
+        20 * zoom + padding * 2,
+      );
+      
+      // Text
+      ctx.fillStyle = dept.textColor;
+      ctx.fillText(dept.name, labelX, labelY);
+    }
+    
+    ctx.restore();
+  }
 }
 
 export function renderFrame(
@@ -591,6 +650,11 @@ export function renderFrame(
 
   // Draw tiles (floor + wall base color)
   renderTileGrid(ctx, tileMap, offsetX, offsetY, zoom, tileColors, layoutCols);
+
+  // Draw department zones (below furniture/characters)
+  if (selection?.departments && selection.departments.length > 0) {
+    renderDepartments(ctx, selection.departments, offsetX, offsetY, zoom);
+  }
 
   // Seat indicators (below furniture/characters, on top of floor)
   if (selection) {
