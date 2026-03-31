@@ -30,12 +30,12 @@ export const DEPARTMENT_COLORS: Record<DepartmentId, { primary: string; light: s
   },
 };
 
-/** Human-readable names for departments */
+/** Human-readable names for departments - shorter for display */
 export const DEPARTMENT_NAMES: Record<DepartmentId, string> = {
-  [DeptId.RESPONDING]: 'Respondiendo mensajes',
-  [DeptId.QUALIFYING]: 'Calificando lead',
-  [DeptId.SCHEDULING]: 'Agendando cita',
-  [DeptId.REST]: 'Descanso',
+  [DeptId.RESPONDING]: 'MENSAJES',
+  [DeptId.QUALIFYING]: 'LEADS',
+  [DeptId.SCHEDULING]: 'CITAS',
+  [DeptId.REST]: 'DESCANSO',
 };
 
 /**
@@ -43,51 +43,61 @@ export const DEPARTMENT_NAMES: Record<DepartmentId, string> = {
  * Zones are defined as tile coordinates where agents can walk and work.
  */
 export function getDepartments(cols: number, rows: number): Department[] {
-  // Divide the office into 4 quadrants for the 4 departments
+  // Create clean, regular department zones that avoid furniture areas
+  // Using fixed margins for consistency across different screen sizes
+  const marginLeft = 2;
+  const marginRight = 2;
+  const marginTop = 5;  // Start below furniture
+  const marginBottom = 3;
+  
+  // Calculate center point
   const midCol = Math.floor(cols / 2);
   const midRow = Math.floor(rows / 2);
-  const labelRow = 2; // Row for department labels
+  
+  // Zone dimensions - clean rectangular areas
+  const zoneWidth = midCol - marginLeft - 2;
+  const zoneHeight = midRow - marginTop - 2;
 
   return [
     {
       id: DeptId.RESPONDING,
-      name: DEPARTMENT_NAMES[DeptId.RESPONDING],
+      name: 'MENSAJES',
       color: DEPARTMENT_COLORS[DeptId.RESPONDING].primary,
       colorLight: DEPARTMENT_COLORS[DeptId.RESPONDING].light,
       textColor: DEPARTMENT_COLORS[DeptId.RESPONDING].text,
-      // Top-left quadrant - Responding (Blue)
-      zoneTiles: generateZoneTiles(2, 4, midCol - 2, midRow - 2),
-      labelPosition: { col: Math.floor(midCol / 2), row: labelRow },
+      // Top-left: Clean rectangular zone
+      zoneTiles: generateZoneTiles(marginLeft, marginTop, midCol - 2, midRow - 1),
+      labelPosition: { col: Math.floor((marginLeft + midCol - 2) / 2), row: marginTop - 1 },
     },
     {
       id: DeptId.QUALIFYING,
-      name: DEPARTMENT_NAMES[DeptId.QUALIFYING],
+      name: 'LEADS',
       color: DEPARTMENT_COLORS[DeptId.QUALIFYING].primary,
       colorLight: DEPARTMENT_COLORS[DeptId.QUALIFYING].light,
       textColor: DEPARTMENT_COLORS[DeptId.QUALIFYING].text,
-      // Top-right quadrant - Qualifying (Orange)
-      zoneTiles: generateZoneTiles(midCol + 2, 4, cols - 4, midRow - 2),
-      labelPosition: { col: Math.floor((midCol + cols) / 2), row: labelRow },
+      // Top-right: Clean rectangular zone
+      zoneTiles: generateZoneTiles(midCol + 2, marginTop, cols - marginRight, midRow - 1),
+      labelPosition: { col: Math.floor((midCol + 2 + cols - marginRight) / 2), row: marginTop - 1 },
     },
     {
       id: DeptId.SCHEDULING,
-      name: DEPARTMENT_NAMES[DeptId.SCHEDULING],
+      name: 'CITAS',
       color: DEPARTMENT_COLORS[DeptId.SCHEDULING].primary,
       colorLight: DEPARTMENT_COLORS[DeptId.SCHEDULING].light,
       textColor: DEPARTMENT_COLORS[DeptId.SCHEDULING].text,
-      // Bottom-left quadrant - Scheduling (Green)
-      zoneTiles: generateZoneTiles(2, midRow + 2, midCol - 2, rows - 4),
-      labelPosition: { col: Math.floor(midCol / 2), row: rows - 3 },
+      // Bottom-left: Clean rectangular zone
+      zoneTiles: generateZoneTiles(marginLeft, midRow + 1, midCol - 2, rows - marginBottom),
+      labelPosition: { col: Math.floor((marginLeft + midCol - 2) / 2), row: rows - marginBottom + 1 },
     },
     {
       id: DeptId.REST,
-      name: DEPARTMENT_NAMES[DeptId.REST],
+      name: 'DESCANSO',
       color: DEPARTMENT_COLORS[DeptId.REST].primary,
       colorLight: DEPARTMENT_COLORS[DeptId.REST].light,
       textColor: DEPARTMENT_COLORS[DeptId.REST].text,
-      // Bottom-right quadrant - Rest (Gray)
-      zoneTiles: generateZoneTiles(midCol + 2, midRow + 2, cols - 4, rows - 4),
-      labelPosition: { col: Math.floor((midCol + cols) / 2), row: rows - 3 },
+      // Bottom-right: Clean rectangular zone
+      zoneTiles: generateZoneTiles(midCol + 2, midRow + 1, cols - marginRight, rows - marginBottom),
+      labelPosition: { col: Math.floor((midCol + 2 + cols - marginRight) / 2), row: rows - marginBottom + 1 },
     },
   ];
 }

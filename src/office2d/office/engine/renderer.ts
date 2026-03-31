@@ -595,22 +595,33 @@ export function renderDepartments(
       const labelX = offsetX + dept.labelPosition.col * TILE_SIZE * zoom;
       const labelY = offsetY + dept.labelPosition.row * TILE_SIZE * zoom;
       
-      ctx.font = `bold ${Math.max(12, 16 * zoom)}px sans-serif`;
+      ctx.font = `bold ${Math.max(14, 18 * zoom)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      // Text background
       const textMetrics = ctx.measureText(dept.name);
-      const padding = 8 * zoom;
-      ctx.fillStyle = dept.color;
-      ctx.fillRect(
-        labelX - textMetrics.width / 2 - padding,
-        labelY - 10 * zoom - padding,
-        textMetrics.width + padding * 2,
-        20 * zoom + padding * 2,
-      );
+      const padding = 10 * zoom;
+      const boxWidth = textMetrics.width + padding * 2;
+      const boxHeight = 24 * zoom + padding * 2;
+      const boxX = labelX - boxWidth / 2;
+      const boxY = labelY - boxHeight / 2;
       
-      // Text
+      // Shadow/Outline for better visibility
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(boxX + 2, boxY + 2, boxWidth, boxHeight);
+      
+      // Main background
+      ctx.fillStyle = dept.color;
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+      
+      // Border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.lineWidth = 2 * zoom;
+      ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+      
+      // Text with shadow for readability
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillText(dept.name, labelX + 1, labelY + 1);
       ctx.fillStyle = dept.textColor;
       ctx.fillText(dept.name, labelX, labelY);
     }
