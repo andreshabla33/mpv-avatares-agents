@@ -13,6 +13,14 @@ function App() {
   const [soundOn, setSoundOn] = useState(true)
   const [assetsReady, setAssetsReady] = useState(false)
   const prevStatesRef = useRef({})
+  const pixelOfficeRef = useRef(null)
+
+  // Sync agents with office characters whenever agents change
+  useEffect(() => {
+    if (pixelOfficeRef.current && agents.length > 0) {
+      pixelOfficeRef.current.syncAgents(agents, states);
+    }
+  }, [agents, states]);
 
   // Check when assets are loaded
   useEffect(() => {
@@ -111,6 +119,7 @@ function App() {
             </div>
           ) : (
             <PixelOffice
+              ref={pixelOfficeRef}
               agents={agents}
               states={states}
               extras={extras}

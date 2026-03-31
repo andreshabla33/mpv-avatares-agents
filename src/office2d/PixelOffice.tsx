@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 
 import { BottomToolbar } from './components/BottomToolbar';
 import { DebugView } from './components/DebugView';
@@ -15,6 +15,7 @@ import { OfficeState } from './office/engine/officeState';
 import { isRotatable } from './office/layout/furnitureCatalog';
 import { EditTool } from './office/types';
 import { isBrowserRuntime } from './runtime';
+import { Direction } from './office/types';
 
 const officeStateRef = { current: null as OfficeState | null };
 const editorState = new EditorState();
@@ -118,7 +119,25 @@ function EditActionBar({
   );
 }
 
-export default function PixelOffice({ agents: initialAgents, states: rawAgentStatuses, onAgentClick }: { agents: any[], states: any, onAgentClick?: (agent: any) => void }) {
+const PixelOffice = forwardRef(function PixelOffice({ agents: initialAgents, states: rawAgentStatuses, onAgentClick }: { agents: any[], states: any, onAgentClick?: (agent: any) => void }, ref) {
+  // Expose syncAgents method to parent component
+  useImperativeHandle(ref, () => ({
+    syncAgents: (agents: any[], states: any) => {
+      const os = getOfficeState();
+      agents.forEach((agent) => {
+        const agentId = parseInt(String(agent.id).replace(/\D/g, ''), 10);
+        if (isNaN(agentId)) return;
+
+        // If character doesn't exist, create it
+        if (!os.characters.has(agentId)) {
+          os.addAgent(agentId, agent.name || `Agent ${agentId}`);
+          // Assign to a seat
+          os.sendToSeat(agentId);
+          console.log(`[PixelOffice] Created character for agent ${agentId}: ${agent.name}`);
+        }
+      });
+    }
+  }));
   useEffect(() => {
     if (isBrowserRuntime) {
       import('./browserMock').then(({ dispatchMockMessages }) => {
@@ -425,3 +444,6 @@ export default function PixelOffice({ agents: initialAgents, states: rawAgentSta
     </div>
   );
 }
+
+
+export default PixelOffice;
