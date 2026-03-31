@@ -173,17 +173,34 @@ export function useExtensionMessages(
           { palette?: number; hueShift?: number; seatId?: string }
         >;
         const folderNames = (msg.folderNames || {}) as Record<number, string>;
-        // Buffer agents — they'll be added in layoutLoaded after seats are built
-        for (const id of incoming) {
-          const m = meta[id];
-          pendingAgents.push({
-            id,
-            palette: m?.palette,
-            hueShift: m?.hueShift,
-            seatId: m?.seatId,
-            folderName: folderNames[id],
-          });
+        
+        if (!layoutReadyRef.current) {
+          // Buffer agents — they'll be added in layoutLoaded after seats are built
+          for (const id of incoming) {
+            const m = meta[id];
+            pendingAgents.push({
+              id,
+              palette: m?.palette,
+              hueShift: m?.hueShift,
+              seatId: m?.seatId,
+              folderName: folderNames[id],
+            });
+          }
+        } else {
+          // Layout already loaded, add agents immediately
+          let added = false;
+          for (const id of incoming) {
+            const m = meta[id];
+            if (!os.characters.has(id)) {
+              os.addAgent(id, m?.palette, m?.hueShift, m?.seatId, true, folderNames[id]);
+              added = true;
+            }
+          }
+          if (added) {
+            saveAgentSeats(os);
+          }
         }
+
         setAgents((prev) => {
           const ids = new Set(prev);
           const merged = [...prev];
