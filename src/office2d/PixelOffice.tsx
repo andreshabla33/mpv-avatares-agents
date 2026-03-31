@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { BottomToolbar } from './components/BottomToolbar';
 import { DebugView } from './components/DebugView';
@@ -15,7 +15,6 @@ import { OfficeState } from './office/engine/officeState';
 import { isRotatable } from './office/layout/furnitureCatalog';
 import { EditTool } from './office/types';
 import { isBrowserRuntime } from './runtime';
-import { Direction } from './office/types';
 
 const officeStateRef = { current: null as OfficeState | null };
 const editorState = new EditorState();
@@ -119,25 +118,7 @@ function EditActionBar({
   );
 }
 
-const PixelOffice = forwardRef(function PixelOffice({ agents: initialAgents, states: rawAgentStatuses, onAgentClick }: { agents: any[], states: any, onAgentClick?: (agent: any) => void }, ref) {
-  // Expose syncAgents method to parent component
-  useImperativeHandle(ref, () => ({
-    syncAgents: (agents: any[], states: any) => {
-      const os = getOfficeState();
-      agents.forEach((agent) => {
-        const agentId = parseInt(String(agent.id).replace(/\D/g, ''), 10);
-        if (isNaN(agentId)) return;
-
-        // If character doesn't exist, create it
-        if (!os.characters.has(agentId)) {
-          os.addAgent(agentId, agent.name || `Agent ${agentId}`);
-          // Assign to a seat
-          os.sendToSeat(agentId);
-          console.log(`[PixelOffice] Created character for agent ${agentId}: ${agent.name}`);
-        }
-      });
-    }
-  }));
+export default function PixelOffice({ agents: initialAgents, states: rawAgentStatuses, onAgentClick }: { agents: any[], states: any, onAgentClick?: (agent: any) => void }) {
   useEffect(() => {
     if (isBrowserRuntime) {
       import('./browserMock').then(({ dispatchMockMessages }) => {
@@ -174,12 +155,12 @@ const PixelOffice = forwardRef(function PixelOffice({ agents: initialAgents, sta
   useEffect(() => {
     if (!layoutReady) return;
     
-    const activeAgents = initialAgents.filter(a => a.hasRealData);
-    const currentIds = activeAgents.map(a => parseInt(String(a.id).replace(/\D/g, ''), 10)).filter(id => !isNaN(id));
+    // In demo mode or API mode, map all provided agents
+    const currentIds = initialAgents.map(a => parseInt(String(a.id).replace(/\D/g, ''), 10)).filter(id => !isNaN(id));
     const prevIds = prevAgentsRef.current;
     
     if (prevIds.length === 0 && currentIds.length > 0) {
-      const folderNames = Object.fromEntries(activeAgents.map(a => [parseInt(String(a.id).replace(/\D/g, ''), 10), a.name]).filter(([id]) => !isNaN(id as number)));
+      const folderNames = Object.fromEntries(initialAgents.map(a => [parseInt(String(a.id).replace(/\D/g, ''), 10), a.name]).filter(([id]) => !isNaN(id as number)));
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'existingAgents', agents: currentIds, folderNames }
       }));
@@ -188,7 +169,7 @@ const PixelOffice = forwardRef(function PixelOffice({ agents: initialAgents, sta
       const toRemove = prevIds.filter(id => !currentIds.includes(id));
       
       toAdd.forEach(id => {
-        const agent = activeAgents.find(a => parseInt(String(a.id).replace(/\D/g, ''), 10) === id);
+        const agent = initialAgents.find(a => parseInt(String(a.id).replace(/\D/g, ''), 10) === id);
         window.dispatchEvent(new MessageEvent('message', {
           data: { type: 'agentCreated', id, folderName: agent ? agent.name : '' }
         }));
@@ -444,6 +425,3 @@ const PixelOffice = forwardRef(function PixelOffice({ agents: initialAgents, sta
     </div>
   );
 }
-
-
-export default PixelOffice;
