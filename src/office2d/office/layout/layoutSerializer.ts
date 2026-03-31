@@ -268,6 +268,34 @@ export function createDefaultLayout(): OfficeLayout {
   return { version: 1, cols: DEFAULT_COLS, rows: DEFAULT_ROWS, tiles, tileColors, furniture: [] };
 }
 
+/** Create an empty layout with given dimensions - no furniture, just floors and walls */
+export function createEmptyLayout(cols: number, rows: number): OfficeLayout {
+  const W = TileType.WALL;
+  const F1 = TileType.FLOOR_1;
+  const F2 = TileType.FLOOR_2;
+
+  const tiles: TileTypeVal[] = [];
+  const tileColors: Array<FloorColor | null> = [];
+  const midCol = Math.floor(cols / 2);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) {
+        tiles.push(W);
+        tileColors.push(null);
+      } else if (c < midCol) {
+        tiles.push(F1);
+        tileColors.push(DEFAULT_LEFT_ROOM_COLOR);
+      } else {
+        tiles.push(F2);
+        tileColors.push(DEFAULT_RIGHT_ROOM_COLOR);
+      }
+    }
+  }
+
+  return { version: 1, cols, rows, tiles, tileColors, furniture: [] };
+}
+
 /** Serialize layout to JSON string */
 export function serializeLayout(layout: OfficeLayout): string {
   return JSON.stringify(layout);

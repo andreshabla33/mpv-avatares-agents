@@ -2,6 +2,7 @@ export type { CatalogEntryWithCategory, FurnitureCategory } from './furnitureCat
 export { FURNITURE_CATEGORIES, getCatalogByCategory, getCatalogEntry } from './furnitureCatalog';
 export {
   createDefaultLayout,
+  createEmptyLayout,
   deserializeLayout,
   getBlockedTiles,
   getSeatTiles,
