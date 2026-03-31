@@ -16,11 +16,14 @@ import {
 import { getAnimationFrames, getCatalogEntry, getOnStateType } from '../layout/furnitureCatalog';
 import {
   createDefaultLayout,
+  deserializeLayout,
   getBlockedTiles,
   layoutToFurnitureInstances,
   layoutToSeats,
   layoutToTileMap,
+  serializeLayout,
 } from '../layout/layoutSerializer';
+import { loadSavedLayout, saveLayout } from '../layout/layoutPersistence';
 import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap';
 import type {
   Character,
@@ -61,7 +64,9 @@ export class OfficeState {
   private nextSubagentId = -1;
 
   constructor(layout?: OfficeLayout) {
-    this.layout = layout || createDefaultLayout();
+    // Try to load saved layout first, fall back to provided or default
+    const savedLayout = !layout ? loadSavedLayout() : null;
+    this.layout = layout || savedLayout || createDefaultLayout();
     this.tileMap = layoutToTileMap(this.layout);
     this.seats = layoutToSeats(this.layout.furniture);
     this.blockedTiles = getBlockedTiles(this.layout.furniture);
@@ -72,6 +77,7 @@ export class OfficeState {
   }
 
   /** Rebuild all derived state from a new layout. Reassigns existing characters.
+   * Also auto-saves the layout to localStorage.
    *  @param shift Optional pixel shift to apply when grid expands left/up */
   rebuildFromLayout(layout: OfficeLayout, shift?: { col: number; row: number }): void {
     this.layout = layout;
@@ -80,6 +86,9 @@ export class OfficeState {
     this.blockedTiles = getBlockedTiles(layout.furniture);
     this.rebuildFurnitureInstances();
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles);
+
+    // Auto-save layout to localStorage
+    saveLayout(layout);
 
     // Shift character positions when grid expands left/up
     if (shift && (shift.col !== 0 || shift.row !== 0)) {
